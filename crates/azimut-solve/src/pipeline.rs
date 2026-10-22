@@ -35,6 +35,12 @@ pub struct FileRef {
     pub role: String,
     /// Gimbal yaw, pitch, roll from the image XMP, degrees.
     pub gimbal_ypr_deg: Option<[f64; 3]>,
+    /// This file's exposure time minus the capture's (the MRK time), seconds, from the XMP
+    /// clock. Mavic 3M bands are exposed about 26 ms after the RGB JPEG. `None` when the file
+    /// has no exposure time.
+    pub time_offset_s: Option<f64>,
+    /// Camera centre at this file's own exposure time.
+    pub camera: Option<CameraCentre>,
 }
 
 /// Result for one exposure (one capture).
@@ -61,6 +67,8 @@ pub struct SolutionStats {
     pub exposures_missing: usize,
     /// Exposures with a camera centre but no usable RTKLIB covariance.
     pub exposures_without_sigma: usize,
+    /// Files of positioned exposures that could not be positioned at their own time.
+    pub files_without_position: usize,
     /// Largest |height check| over exposures, metres (lever-arm sanity check).
     pub max_height_check_m: f64,
 }
@@ -93,8 +101,8 @@ pub struct FlightSolution {
 
 /// The image files of one capture.
 pub(crate) fn exposure_files(flight: &Flight, capture: usize) -> Vec<FileRef> {
-    flight.captures[capture]
-        .members
+    let cap = &flight.captures[capture];
+    cap.members
         .iter()
         .map(|&i| {
             let p = &flight.photos[i];
@@ -103,9 +111,60 @@ pub(crate) fn exposure_files(flight: &Flight, capture: usize) -> Vec<FileRef> {
                 path: p.path.clone(),
                 role: role(&p.kind),
                 gimbal_ypr_deg: p.gimbal_ypr_deg,
+                // Both readings come from the same camera clock, so GPS/UTC labels cancel.
+                time_offset_s: p.exposure_clock_s.zip(cap.exposure_clock_s).map(|(f, c)| f - c),
+                camera: None,
             }
         })
         .collect()
+}
+
+/// Give every file of a positioned exposure its own camera centre. `locate(dt)` returns the
+/// camera centre `dt` seconds after the MRK time, or why there is none. Files without an
+/// exposure time are placed at the MRK time, which is said in the exposure's problem.
+pub(crate) fn place_files(e: &mut ExposureSolution, locate: impl Fn(f64) -> Result<CameraCentre, String>) {
+    let Some(at_mrk) = e.camera else {
+        return;
+    };
+    let mut notes = Vec::new();
+    for f in &mut e.files {
+        let dt = match f.time_offset_s {
+            Some(dt) => dt,
+            None => {
+                notes.push(format!(
+                    "{}: no exposure time, placed at the MRK time",
+                    f.file_name
+                ));
+                0.0
+            }
+        };
+        f.camera = if dt.abs() < 1e-6 {
+            Some(at_mrk)
+        } else {
+            match locate(dt) {
+                Ok(c) => {
+                    if c.sigma_enu_m.is_none() && at_mrk.sigma_enu_m.is_some() {
+                        notes.push(format!(
+                            "{}: no valid uncertainty at its exposure time",
+                            f.file_name
+                        ));
+                    }
+                    Some(c)
+                }
+                Err(why) => {
+                    notes.push(format!("{}: {why}", f.file_name));
+                    None
+                }
+            }
+        };
+    }
+    if !notes.is_empty() {
+        let joined = notes.join("; ");
+        e.problem = Some(match e.problem.take() {
+            Some(p) => format!("{p}; {joined}"),
+            None => joined,
+        });
+    }
 }
 
 /// Add the captures without an MRK record, sort by time and count.
@@ -138,6 +197,7 @@ pub(crate) fn finish(
             None => stats.exposures_missing += 1,
         }
         if let Some(c) = e.camera {
+            stats.files_without_position += e.files.iter().filter(|f| f.camera.is_none()).count();
             if c.sigma_enu_m.is_none() {
                 stats.exposures_without_sigma += 1;
             }
@@ -221,6 +281,11 @@ pub fn process_flight(
     for pair in &flight.matching.pairs {
         let rec = &flight.mrk[pair.mrk].record;
         let t = rec.gps_seconds();
+        let at = |t: f64| -> Result<CameraCentre, String> {
+            antenna_at(&traj, t, opts.max_gap_s)
+                .map(|fix| camera_centre(&fix, rec.offset_ned_mm))
+                .map_err(|e| e.to_string())
+        };
         let (camera, problem) = match antenna_at(&traj, t, opts.max_gap_s) {
             Ok(fix) => {
                 let c = camera_centre(&fix, rec.offset_ned_mm);
@@ -232,13 +297,16 @@ pub fn process_flight(
             }
             Err(e) => (None, Some(e.to_string())),
         };
-        exposures.push(ExposureSolution {
+        let mut e = ExposureSolution {
             index: Some(rec.index),
             gps_s: Some(t),
             files: exposure_files(flight, pair.capture),
             camera,
             problem,
-        });
+        };
+        // The MRK lever arm is the RGB camera's; the band lenses' own offset is not documented.
+        place_files(&mut e, |dt| at(t + dt));
+        exposures.push(e);
     }
     let (exposures, stats) = finish(flight, exposures, stats);
 

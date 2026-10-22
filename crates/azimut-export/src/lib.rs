@@ -4,6 +4,9 @@
 //!
 //! - [`positions_csv`]: one row per image file (all Mavic 3M bands included), with
 //!   1-sigma East/North/Up and the reference frame. Imports into Metashape and Pix4D.
+//!
+//! Each file gets its own position and time: Mavic 3M bands are exposed after the RGB JPEG
+//! that the MRK times, so their row differs from the JPEG's.
 //! - [`odm_geo_txt`]: OpenDroneMap `geo.txt` (EPSG:4326, ellipsoidal heights).
 //! - [`problems_csv`]: exposures without a camera centre or without an uncertainty, and why.
 //!
@@ -50,16 +53,20 @@ pub fn positions_csv(sol: &FlightSolution, filter: &RowFilter) -> String {
     );
     let frame = csv_field(&sol.frame);
     for e in &sol.exposures {
-        let (Some(c), Some(t)) = (e.camera, e.gps_s) else {
+        let Some(t0) = e.gps_s else {
             continue;
         };
-        let week = (t / SECONDS_PER_WEEK).floor();
-        let tow = t - week * SECONDS_PER_WEEK;
-        let sigma = c
-            .sigma_enu_m
-            .map(|[e, n, u]| format!("{e:.4},{n:.4},{u:.4}"))
-            .unwrap_or_else(|| ",,".into());
         for f in e.files.iter().filter(|f| filter.keep(&f.role)) {
+            let Some(c) = f.camera else {
+                continue;
+            };
+            let t = t0 + f.time_offset_s.unwrap_or(0.0);
+            let week = (t / SECONDS_PER_WEEK).floor();
+            let tow = t - week * SECONDS_PER_WEEK;
+            let sigma = c
+                .sigma_enu_m
+                .map(|[e, n, u]| format!("{e:.4},{n:.4},{u:.4}"))
+                .unwrap_or_else(|| ",,".into());
             let _ = writeln!(
                 s,
                 "{},{},{},{},{:.6},{:.10},{:.10},{:.4},{},{},{},{}",
@@ -91,8 +98,8 @@ pub fn positions_csv(sol: &FlightSolution, filter: &RowFilter) -> String {
 pub fn odm_geo_txt(sol: &FlightSolution, filter: &RowFilter) -> String {
     let mut s = String::from("EPSG:4326\n");
     for e in &sol.exposures {
-        let Some(c) = e.camera else { continue };
         for f in e.files.iter().filter(|f| filter.keep(&f.role)) {
+            let Some(c) = f.camera else { continue };
             let _ = write!(
                 s,
                 "{} {:.10} {:.10} {:.4}",
@@ -145,11 +152,13 @@ mod tests {
             n_sats: Some(21),
             height_check_m: 0.0,
         };
-        let file = |n: &str, r: &str| FileRef {
+        let file = |n: &str, r: &str, camera: Option<CameraCentre>| FileRef {
             file_name: n.into(),
             path: PathBuf::from(n),
             role: r.into(),
             gimbal_ypr_deg: (r == "jpeg").then_some([0.5, -90.0, 0.0]),
+            time_offset_s: Some(0.0),
+            camera,
         };
         FlightSolution {
             dir: PathBuf::from("f"),
@@ -164,14 +173,17 @@ mod tests {
                 ExposureSolution {
                     index: Some(1),
                     gps_s: Some(2420.0 * SECONDS_PER_WEEK + 10.5),
-                    files: vec![file("A_D.JPG", "jpeg"), file("A_MS_G.TIF", "Green")],
+                    files: vec![
+                        file("A_D.JPG", "jpeg", Some(cam)),
+                        file("A_MS_G.TIF", "Green", Some(cam)),
+                    ],
                     camera: Some(cam),
                     problem: None,
                 },
                 ExposureSolution {
                     index: Some(2),
                     gps_s: Some(2420.0 * SECONDS_PER_WEEK + 12.5),
-                    files: vec![file("B_D.JPG", "jpeg")],
+                    files: vec![file("B_D.JPG", "jpeg", None)],
                     camera: None,
                     problem: Some("exposure outside the PPK trajectory".into()),
                 },
@@ -209,6 +221,26 @@ mod tests {
     }
 
     #[test]
+    fn band_rows_have_their_own_time_and_position() {
+        let mut sol = sample();
+        let band = &mut sol.exposures[0].files[1];
+        band.time_offset_s = Some(0.0264);
+        band.camera.as_mut().unwrap().lat_deg = 46.3500009;
+        let csv = positions_csv(&sol, &RowFilter::All);
+        assert!(csv.lines().nth(1).unwrap().contains(",10.500000,46.3500000000,"));
+        assert!(csv.lines().nth(2).unwrap().contains(",10.526400,46.3500009000,"));
+        let g = odm_geo_txt(&sol, &RowFilter::All);
+        assert!(g
+            .lines()
+            .nth(2)
+            .unwrap()
+            .starts_with("A_MS_G.TIF -72.5500000000 46.3500009000 "));
+        // A file that could not be positioned at its own time gets no row.
+        sol.exposures[0].files[1].camera = None;
+        assert_eq!(positions_csv(&sol, &RowFilter::All).lines().count(), 2);
+    }
+
+    #[test]
     fn problems_are_listed() {
         let p = problems_csv(&sample());
         assert!(p.contains("2,B_D.JPG,exposure outside the PPK trajectory"));
@@ -219,6 +251,9 @@ mod tests {
         let mut sol = sample();
         let e = &mut sol.exposures[0];
         e.camera.as_mut().unwrap().sigma_enu_m = None;
+        for f in &mut e.files {
+            f.camera.as_mut().unwrap().sigma_enu_m = None;
+        }
         e.problem = Some("RTKLIB covariance not positive definite; uncertainty left empty".into());
         let csv = positions_csv(&sol, &RowFilter::All);
         assert!(csv.lines().nth(1).unwrap().contains(",119.8200,,,,fixed,21,"));

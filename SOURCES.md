@@ -20,6 +20,7 @@ or interface text of closed-source tools as a source.
 |---|---|---|
 | XMP fields `UTCAtExposure` (microsecond precision, `YYYY:MM:DD HH:MM:SS.ffffff`) and `CaptureUUID` | `photo.rs`, `time.rs` | [Mavic 3M User Manual](https://dl.djicdn.com/downloads/DJI_Mavic_3_Enterprise/20240814/DJI_Mavic_3M_User_Manual_EN.pdf); Matrice 4 manual |
 | `UTCAtExposure` measured as GPS time (18 s ahead of UTC) on P1 and L2 data, despite its label; pair on time, not order | `matching.rs` (tries both readings) | [dji-geotagger output.md](https://github.com/geo-raypan/dji-geotagger/blob/main/docs/output.md); [dji-geotagger commits](https://github.com/geo-raypan/dji-geotagger/commits/main) |
+| `UTCAtExposure` measured as GPS time on Mavic 3M too: equal to the MRK GPS time within 1 µs | `matching.rs` | Own measurement: Mavic 3M, firmware 11.08.01.41, August 2024 flight, 13 captures (maintainer's data, not committed), read independently with ExifTool 12.76 |
 | GPS - UTC = 18 s since 2017-01-01 | `time.rs` | IERS Bulletin C (no leap second since 2017) |
 | XMP in JPEG: APP1 segment starting `http://ns.adobe.com/xap/1.0/\0` | `headers.rs` | Adobe XMP Specification Part 3 |
 | XMP in TIFF: tag 700 (BYTE/UNDEFINED) | `headers.rs` | Adobe XMP Specification Part 3; TIFF 6.0 |
@@ -32,6 +33,8 @@ or interface text of closed-source tools as a source.
 | Band from XMP `BandName`, value `RedEdge` without a space; file names vary (`_MS_G` or `_G`) | `photo.rs` | [m3m_radcal SPEC.md](https://github.com/Eggpl4ntE4ter/m3m_radcal/blob/main/docs/SPEC.md); [uav_pytools](https://github.com/Jeff-Tracey/uav_pytools) |
 | Group on `CaptureUUID`, fall back on file names | `capture.rs` | [OpenDroneMap photo.py](https://raw.githubusercontent.com/OpenDroneMap/ODM/master/opendm/photo.py) |
 | MRK has one line per RGB photo (captures), not per file | `matching.rs` | [Emlid community](https://community.emlid.com/t/ppk-processing-of-multispectral-drone-data/39286); [DJI Terra accuracy notes](https://terra.dji.com/user-manual/ko/accuracy-whitepaper/photogrammetry-accuracy.html) |
+| The MRK times the RGB JPEG; the four band TIFFs are exposed 26.3 ± 0.3 ms later, together (spread under 0.5 ms), so each file is positioned at its own `UTCAtExposure` | `pipeline.rs` (`time_offset_s`, `place_files`), `rtk_shift.rs` | Own measurement, same flight as above: 13 captures, JPEG `UTCAtExposure` equal to the MRK time within 1 µs |
+| One XMP packet per JPEG and per TIFF; MRK record number equals the file number | `headers.rs`, `matching.rs` | Own measurement, same flight |
 | Radiometric XMP tags must survive any edit; Pillow/ImageMagick/GDAL rewrite or drop metadata | design rule (read-only by default) | Mavic 3M Image Processing Guide; [ImageMagick #1674](https://github.com/ImageMagick/ImageMagick/issues/1674) |
 
 ## Folder layout and pitfalls

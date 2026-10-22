@@ -443,7 +443,8 @@ fn diagnose(f: &mut Flight) {
                 Severity::Info,
                 "m3m_clock_spread",
                 format!(
-                    "Exposure times within one capture differ by up to {spread:.3} s; the JPEG time is used."
+                    "Exposure times within one capture differ by up to {spread:.3} s (Mavic 3M bands are \
+                     exposed after the RGB JPEG); each file is positioned at its own exposure time."
                 ),
             ));
         }

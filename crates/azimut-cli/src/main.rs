@@ -623,6 +623,12 @@ fn print_solution(sol: &FlightSolution) {
             }
         }
     }
+    if st.files_without_position > 0 {
+        println!(
+            "   WARNING: {} file(s) could not be positioned at their own exposure time (see problems.csv)",
+            st.files_without_position
+        );
+    }
     if st.max_height_check_m > 0.001 {
         println!(
             "   WARNING: lever-arm height check off by {:.4} m",
