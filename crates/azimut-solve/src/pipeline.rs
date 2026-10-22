@@ -45,7 +45,7 @@ pub struct ExposureSolution {
     pub gps_s: Option<f64>,
     pub files: Vec<FileRef>,
     pub camera: Option<CameraCentre>,
-    /// Why there is no camera centre.
+    /// Why there is no camera centre, or why it has no uncertainty.
     pub problem: Option<String>,
 }
 
@@ -58,6 +58,8 @@ pub struct SolutionStats {
     pub exposures_float: usize,
     pub exposures_other: usize,
     pub exposures_missing: usize,
+    /// Exposures with a camera centre but no usable RTKLIB covariance.
+    pub exposures_without_sigma: usize,
     /// Largest |height check| over exposures, metres (lever-arm sanity check).
     pub max_height_check_m: f64,
 }
@@ -167,7 +169,14 @@ pub fn process_flight(
         let rec = &flight.mrk[pair.mrk].record;
         let t = rec.gps_seconds();
         let (camera, problem) = match antenna_at(&traj, t, opts.max_gap_s) {
-            Ok(fix) => (Some(camera_centre(&fix, rec.offset_ned_mm)), None),
+            Ok(fix) => {
+                let c = camera_centre(&fix, rec.offset_ned_mm);
+                let problem = c
+                    .sigma_enu_m
+                    .is_none()
+                    .then(|| "RTKLIB covariance not positive definite; uncertainty left empty".to_string());
+                (Some(c), problem)
+            }
             Err(e) => (None, Some(e.to_string())),
         };
         exposures.push(ExposureSolution {
@@ -202,6 +211,9 @@ pub fn process_flight(
             None => stats.exposures_missing += 1,
         }
         if let Some(c) = e.camera {
+            if c.sigma_enu_m.is_none() {
+                stats.exposures_without_sigma += 1;
+            }
             stats.max_height_check_m = stats.max_height_check_m.max(c.height_check_m.abs());
         }
     }

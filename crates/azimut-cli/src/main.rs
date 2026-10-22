@@ -239,14 +239,14 @@ fn main() -> Result<()> {
                             serde_json::to_string_pretty(&sol)?,
                         )?;
                         let st = &sol.stats;
-                        if st.exposures_missing > 0 {
+                        if st.exposures_missing + st.exposures_without_sigma > 0 {
                             std::fs::write(out.join(format!("{name}_problems.csv")), problems_csv(&sol))?;
                         }
                         let med = |k: usize| {
                             median(
                                 sol.exposures
                                     .iter()
-                                    .filter_map(|e| e.camera.map(|c| c.sigma_enu_m[k])),
+                                    .filter_map(|e| e.camera.and_then(|c| c.sigma_enu_m).map(|s| s[k])),
                             )
                         };
                         println!(
@@ -257,14 +257,23 @@ fn main() -> Result<()> {
                             st.exposures_other,
                             st.exposures_missing
                         );
+                        let sigmas = if st.exposures_without_sigma < st.exposures - st.exposures_missing {
+                            format!("{:.3} / {:.3} / {:.3} m", med(0), med(1), med(2))
+                        } else {
+                            "none".into()
+                        };
                         println!(
-                            "   trajectory: {} epochs, {:.1} % fixed; median sigma E/N/U: {:.3} / {:.3} / {:.3} m",
+                            "   trajectory: {} epochs, {:.1} % fixed; median sigma E/N/U: {sigmas}",
                             st.epochs,
                             100.0 * st.epochs_fixed as f64 / st.epochs.max(1) as f64,
-                            med(0),
-                            med(1),
-                            med(2)
                         );
+                        if st.exposures_without_sigma > 0 {
+                            println!(
+                                "   WARNING: {} exposure(s) without uncertainty: RTKLIB covariance not \
+                                 positive definite (sigma left empty, see problems.csv)",
+                                st.exposures_without_sigma
+                            );
+                        }
                         if st.max_height_check_m > 0.001 {
                             println!(
                                 "   WARNING: lever-arm height check off by {:.4} m",

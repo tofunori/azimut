@@ -65,6 +65,7 @@ Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](
 | Options file keys and value names (`pos1-*`, `pos2-*`, `out-*`, `ant2-*`, `misc-timeinterp`) | `config.rs` | `src/options.c` |
 | `ant2-anttype=*` takes antenna type and offsets from the RINEX header | `config.rs` | `src/postpos.c` |
 | ECEF solution line: x y z Q ns sdx sdy sdz sdxy sdyz sdzx age ratio; covariances written as signed square roots | `pos.rs` | `src/solution.c` (`outecef`, `sqvar`) |
+| A negative variance is written as `sdx = 0` (macro `SQRT`), so a covariance that is not positive definite cannot be told apart from a zero one; such covariances were measured in kinematic mode on RTKLIB-EX's own test data (`test/data/rinex`, stations 0759 and 3040, 2005-04-02: 102 of 115 epochs with stock options, none in static mode). The uncertainty is then left empty | `camera.rs`, `azimut-export` | `src/solution.c` (`SQRT`, `outecef`); own measurement with RTKLIB-EX `50886e2` |
 | Solution status codes 1 fix, 2 float, 3 SBAS, 4 DGPS, 5 single, 6 PPP, 7 dead reckoning | `pos.rs` | `src/rtklib.h` (`SOLQ_*`) |
 | `rnx2rtkp -k conf -o out rover base nav...` | `rtklib.rs` | `app/consapp/rnx2rtkp/rnx2rtkp.c` |
 | `convbin -r rtcm3 -tr y/m/d h:m:s -v 3.04 -od -os -o obs -n nav` (RTCM 3 needs an approximate date) | `rtklib.rs` | `app/consapp/convbin/convbin.c` |
