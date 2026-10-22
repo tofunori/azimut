@@ -81,7 +81,7 @@ writes:
 | `<flight>_positions.csv` | One row per image file (JPEG and Mavic 3M bands): latitude, longitude, ellipsoidal height, 1-sigma E/N/U, fix status, satellites, frame. Imports into Metashape and Pix4D. `--roles Green` keeps one row per capture for a Metashape multi-camera master band. |
 | `<flight>_geo.txt` | OpenDroneMap `geo.txt` (EPSG:4326, ellipsoidal heights), with DJI gimbal yaw/pitch/roll and horizontal/vertical accuracy when the image carries gimbal angles. ODM uses those angles for radiometric calibration, so they are never set to zero. |
 | `<flight>_problems.csv` | Exposures without a position, or without an uncertainty, and why. |
-| `<flight>_solution.json` | Everything above plus the trajectory statistics and file paths. |
+| `<flight>_solution.json` | Everything above plus the method (PPK file paths, or the RTK shift), statistics and file paths. |
 
 When RTKLIB writes a covariance that is not positive definite (it prints 0 for a negative
 variance, seen on kinematic solutions), the uncertainty columns are left empty rather than
@@ -97,6 +97,36 @@ Defaults for DJI aircraft: L1+L2, GPS + GLONASS + Galileo + BeiDou, 15° mask, c
 ambiguity resolution with ratio 3, GLONASS ambiguities left float (base and drone receivers
 come from different makers), base observations interpolated to the 5 Hz drone epochs.
 `--no-beidou` drops BeiDou for logs with reported decoding problems (Matrice 4).
+
+### RTK flights: shifting to a corrected base position
+
+When the aircraft flew in RTK mode with its own base (a D-RTK 2 or a GNSS receiver), its
+real-time positions are relative to the coordinates that base broadcast. If those were only
+approximate, for example a base that averaged its own position for a few minutes, every
+photo is off by the same vector. Once the base position is known precisely, for example
+from a CSRS-PPP solution of the base's RINEX, `shift` moves every real-time camera position
+of the MRK by the difference:
+
+```sh
+./target/release/azimut shift /path/to/campaign \
+    --from 46.3490000,-72.5510000,60.000 \
+    --to 46.3489901,-72.5510153,59.412 \
+    --frame "NAD83(CSRS) v8, epoch 2010.0" \
+    --out results
+```
+
+`--from` is what the base broadcast and `--to` the corrected coordinates of the same physical
+point, both with ellipsoidal heights. `--enu E,N,U` gives the shift in metres instead. The
+outputs are the same files as `process`. The MRK positions are already camera centres, so no
+lever arm is added. Only RTK fixed and float positions are relative to the base: single-point
+positions are not shifted and are listed in `problems.csv`. The uncertainties are the
+aircraft's own, relative to the base; the uncertainty of the corrected base position is not
+added. A vertical shift over 5 m is flagged (an orthometric height given by mistake differs
+by the geoid height, about -30 m in Quebec) and a shift over 500 m is refused.
+
+Images are not modified: the positions go to the CSV and `geo.txt` files that Metashape,
+Pix4D and ODM import. Writing them into the images will come with the ExifTool option, which
+first has to check that the radiometric metadata of Mavic 3M TIFFs stays intact.
 
 ### RINEX checks
 
@@ -159,7 +189,9 @@ manuals. Tested so far on synthetic data only.
    merging, gzip support.
 2. **`azimut-solve`** (this release): RTKLIB-EX `convbin` / `rnx2rtkp`, combined filter,
    ECEF solutions with full covariance, interpolation, MRK lever arm. Next: per-drone
-   profiles tested on real logs, merging logs split at 999 photos, CSRS-PPP base position.
+   profiles tested on real logs, merging logs split at 999 photos, reading CSRS-PPP results
+   (base position, antenna height and frame in one option). `shift` moves RTK flights to a
+   corrected base position (this release).
 3. **`azimut-geo`**: NAD83(CSRS) with epoch, CGVD2013, refusal of approximate
    transformations.
 4. **`azimut-export`** (this release: CSV, ODM `geo.txt`): camera angles and accuracy in

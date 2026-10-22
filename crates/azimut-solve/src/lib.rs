@@ -8,6 +8,7 @@
 //! - [`camera`]: interpolate the antenna to each exposure and apply the MRK lever arm.
 //! - [`geodesy`]: GRS80 conversions and ENU rotations.
 //! - [`pipeline`]: one scanned flight from raw logs to camera centres.
+//! - [`rtk_shift`]: real-time (RTK) MRK positions moved by a constant base correction.
 
 use std::path::{Path, PathBuf};
 
@@ -16,10 +17,12 @@ pub mod config;
 pub mod geodesy;
 pub mod pipeline;
 pub mod pos;
+pub mod rtk_shift;
 pub mod rtklib;
 
 pub use config::{BasePosition, BaseSetup, PpkConfig};
-pub use pipeline::{process_flight, ExposureSolution, FlightSolution, ProcessOptions};
+pub use pipeline::{process_flight, ExposureSolution, FlightSolution, Method, ProcessOptions};
+pub use rtk_shift::{shift_flight, ShiftSpec};
 pub use rtklib::Rtklib;
 
 #[derive(Debug, thiserror::Error)]

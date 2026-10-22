@@ -11,6 +11,7 @@ use azimut_io::time::datetime_from_gps_seconds;
 use crate::camera::{antenna_at, camera_centre, CameraCentre};
 use crate::config::{BaseSetup, PpkConfig};
 use crate::pos::{self, SolQuality};
+use crate::rtk_shift::RtkShift;
 use crate::rtklib::Rtklib;
 use crate::SolveError;
 
@@ -64,18 +65,86 @@ pub struct SolutionStats {
     pub max_height_check_m: f64,
 }
 
+/// How the camera positions of a flight were obtained.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Method {
+    /// Post-processed kinematic solution against a base station (RTKLIB-EX).
+    Ppk {
+        rover_obs: PathBuf,
+        base_obs: PathBuf,
+        navs: Vec<PathBuf>,
+        pos_file: PathBuf,
+    },
+    /// Real-time (RTK) MRK positions moved by a constant shift.
+    RtkShift(RtkShift),
+}
+
 /// Result for one flight.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlightSolution {
     pub dir: PathBuf,
-    pub rover_obs: PathBuf,
-    pub base_obs: PathBuf,
-    pub navs: Vec<PathBuf>,
-    pub pos_file: PathBuf,
+    pub method: Method,
     /// Reference frame of the coordinates (that of the base coordinates).
     pub frame: String,
     pub exposures: Vec<ExposureSolution>,
     pub stats: SolutionStats,
+}
+
+/// The image files of one capture.
+pub(crate) fn exposure_files(flight: &Flight, capture: usize) -> Vec<FileRef> {
+    flight.captures[capture]
+        .members
+        .iter()
+        .map(|&i| {
+            let p = &flight.photos[i];
+            FileRef {
+                file_name: p.file_name.clone(),
+                path: p.path.clone(),
+                role: role(&p.kind),
+                gimbal_ypr_deg: p.gimbal_ypr_deg,
+            }
+        })
+        .collect()
+}
+
+/// Add the captures without an MRK record, sort by time and count.
+pub(crate) fn finish(
+    flight: &Flight,
+    mut exposures: Vec<ExposureSolution>,
+    mut stats: SolutionStats,
+) -> (Vec<ExposureSolution>, SolutionStats) {
+    for &c in &flight.matching.unmatched_captures {
+        exposures.push(ExposureSolution {
+            index: flight.captures[c].sequence,
+            gps_s: None,
+            files: exposure_files(flight, c),
+            camera: None,
+            problem: Some("no MRK record for this capture".into()),
+        });
+    }
+    exposures.sort_by(|a, b| {
+        a.gps_s
+            .unwrap_or(f64::INFINITY)
+            .total_cmp(&b.gps_s.unwrap_or(f64::INFINITY))
+    });
+
+    for e in &exposures {
+        stats.exposures += 1;
+        match e.camera.map(|c| c.quality) {
+            Some(SolQuality::Fixed) => stats.exposures_fixed += 1,
+            Some(SolQuality::Float) => stats.exposures_float += 1,
+            Some(_) => stats.exposures_other += 1,
+            None => stats.exposures_missing += 1,
+        }
+        if let Some(c) = e.camera {
+            if c.sigma_enu_m.is_none() {
+                stats.exposures_without_sigma += 1;
+            }
+            stats.max_height_check_m = stats.max_height_check_m.max(c.height_check_m.abs());
+        }
+    }
+    (exposures, stats)
 }
 
 fn role(kind: &ImageKind) -> String {
@@ -142,26 +211,10 @@ pub fn process_flight(
     let pos_file = rtk.solve(&rover_obs, base_obs, &navs, &conf, &work, &stem)?;
     let traj = pos::read(&pos_file)?;
 
-    let mut stats = SolutionStats {
+    let stats = SolutionStats {
         epochs: traj.len(),
         epochs_fixed: traj.iter().filter(|e| e.quality == SolQuality::Fixed).count(),
         ..Default::default()
-    };
-
-    let files_of = |capture: usize| -> Vec<FileRef> {
-        flight.captures[capture]
-            .members
-            .iter()
-            .map(|&i| {
-                let p = &flight.photos[i];
-                FileRef {
-                    file_name: p.file_name.clone(),
-                    path: p.path.clone(),
-                    role: role(&p.kind),
-                    gimbal_ypr_deg: p.gimbal_ypr_deg,
-                }
-            })
-            .collect()
     };
 
     let mut exposures = Vec::new();
@@ -182,48 +235,21 @@ pub fn process_flight(
         exposures.push(ExposureSolution {
             index: Some(rec.index),
             gps_s: Some(t),
-            files: files_of(pair.capture),
+            files: exposure_files(flight, pair.capture),
             camera,
             problem,
         });
     }
-    for &c in &flight.matching.unmatched_captures {
-        exposures.push(ExposureSolution {
-            index: flight.captures[c].sequence,
-            gps_s: None,
-            files: files_of(c),
-            camera: None,
-            problem: Some("no MRK record for this capture".into()),
-        });
-    }
-    exposures.sort_by(|a, b| {
-        a.gps_s
-            .unwrap_or(f64::INFINITY)
-            .total_cmp(&b.gps_s.unwrap_or(f64::INFINITY))
-    });
-
-    for e in &exposures {
-        stats.exposures += 1;
-        match e.camera.map(|c| c.quality) {
-            Some(SolQuality::Fixed) => stats.exposures_fixed += 1,
-            Some(SolQuality::Float) => stats.exposures_float += 1,
-            Some(_) => stats.exposures_other += 1,
-            None => stats.exposures_missing += 1,
-        }
-        if let Some(c) = e.camera {
-            if c.sigma_enu_m.is_none() {
-                stats.exposures_without_sigma += 1;
-            }
-            stats.max_height_check_m = stats.max_height_check_m.max(c.height_check_m.abs());
-        }
-    }
+    let (exposures, stats) = finish(flight, exposures, stats);
 
     Ok(FlightSolution {
         dir: flight.dir.clone(),
-        rover_obs,
-        base_obs: base_obs.to_path_buf(),
-        navs,
-        pos_file,
+        method: Method::Ppk {
+            rover_obs,
+            base_obs: base_obs.to_path_buf(),
+            navs,
+            pos_file,
+        },
         frame: opts.base.frame.clone(),
         exposures,
         stats,

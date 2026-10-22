@@ -73,7 +73,7 @@ pub fn positions_csv(sol: &FlightSolution, filter: &RowFilter) -> String {
                 c.h_m,
                 sigma,
                 c.quality.label(),
-                c.n_sats,
+                c.n_sats.map(|n| n.to_string()).unwrap_or_default(),
                 frame
             );
         }
@@ -130,7 +130,7 @@ pub fn problems_csv(sol: &FlightSolution) -> String {
 mod tests {
     use super::*;
     use azimut_solve::camera::CameraCentre;
-    use azimut_solve::pipeline::{ExposureSolution, FileRef, SolutionStats};
+    use azimut_solve::pipeline::{ExposureSolution, FileRef, Method, SolutionStats};
     use azimut_solve::pos::SolQuality;
     use std::path::PathBuf;
 
@@ -142,7 +142,7 @@ mod tests {
             h_m: 119.82,
             sigma_enu_m: Some([0.012, 0.011, 0.025]),
             quality: SolQuality::Fixed,
-            n_sats: 21,
+            n_sats: Some(21),
             height_check_m: 0.0,
         };
         let file = |n: &str, r: &str| FileRef {
@@ -153,10 +153,12 @@ mod tests {
         };
         FlightSolution {
             dir: PathBuf::from("f"),
-            rover_obs: PathBuf::new(),
-            base_obs: PathBuf::new(),
-            navs: vec![],
-            pos_file: PathBuf::new(),
+            method: Method::Ppk {
+                rover_obs: PathBuf::new(),
+                base_obs: PathBuf::new(),
+                navs: vec![],
+                pos_file: PathBuf::new(),
+            },
             frame: "NAD83(CSRS) v8, epoch 2010.0".into(),
             exposures: vec![
                 ExposureSolution {

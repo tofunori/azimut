@@ -10,6 +10,7 @@ use azimut_io::mrk::SECONDS_PER_WEEK;
 use azimut_io::scan::{scan, ScanOptions};
 use azimut_io::synthetic::{write_flight, write_rinex, SyntheticFlight, SyntheticRinex};
 use azimut_solve::geodesy::{ecef_to_geodetic, geodetic_to_ecef};
+use azimut_solve::pipeline::Method;
 use azimut_solve::pos::SolQuality;
 use azimut_solve::{process_flight, BaseSetup, PpkConfig, ProcessOptions, Rtklib, SolveError};
 
@@ -130,8 +131,11 @@ fn camera_centres_follow_the_trajectory_and_lever_arm() {
     assert_eq!(sol.stats.exposures_missing, 0);
     assert!(sol.stats.max_height_check_m < 1e-4);
     // Converted rover files and the solution live in the work folder.
-    assert!(sol.rover_obs.starts_with(&s.work));
-    assert!(sol.navs.iter().any(|n| n.starts_with(&s.work)));
+    let Method::Ppk { rover_obs, navs, .. } = &sol.method else {
+        panic!("PPK solution expected");
+    };
+    assert!(rover_obs.starts_with(&s.work));
+    assert!(navs.iter().any(|n| n.starts_with(&s.work)));
     let conf = std::fs::read_to_string(s.work.join("DJI_001/DJI_001.conf")).unwrap();
     assert!(conf.contains("out-solformat     =xyz"));
 
