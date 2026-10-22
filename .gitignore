@@ -1,0 +1,14 @@
+/target
+*.swp
+.DS_Store
+# Never commit survey data or tool outputs
+/data/
+*.JPG
+*.jpg
+*.TIF
+*.tif
+*.MRK
+*.bin
+*.RTK
+*.obs
+*.nav

@@ -1,0 +1,44 @@
+# Sources
+
+Every format rule and design choice in Azimut is tied to a public source. Add a line here
+with any new rule. Do not use closed-source code, decompiled binaries, or outputs, screenshots
+or interface text of closed-source tools as a source.
+
+## MRK exposure log
+
+| Rule | Where in the code | Source |
+|---|---|---|
+| 13 fields: index, GPS TOW, [GPS week], N/E/V offsets (mm), lat, lon, ellipsoidal height, 3 std devs (m), status | `mrk.rs` | [Matrice 4 Series User Manual](https://dl.djicdn.com/downloads/DJI_Matrice_4_Series/DJI_Matrice_4_Series_User_Manual_en.pdf); [Matrice 400 User Manual v1.02](https://dl.djicdn.com/downloads/Matrice_400/UM/20250908/Matrice_400_User_Manual_v1.02_en.pdf); [Mavic 3 Enterprise Series User Manual](https://dl.djicdn.com/downloads/DJI_Mavic_3_Enterprise/20250916/DJI_Mavic_3_Enterprise_Series_User_Manual_EN.pdf); [Zenmuse P1 User Manual v1.4](https://dl.djicdn.com/downloads/Zenmuse_P1/20230530/Zenmuse_P1%20_User%20Manual_v1.4_EN.pdf) |
+| Offsets from antenna phase centre to CMOS centre, V positive downward | `mrk.rs` | [DJI Enterprise Geospatial FAQ](https://enterprise-insights.dji.com/blog/geospatial-solutions-faq) |
+| Values carry suffixes (`,N`, `,Lat`, `,Q`...); latitude comes before longitude in real files | `mrk.rs` (read by suffix) | [Agisoft forum, P4RTK MRK](https://www.agisoft.com/forum/index.php?topic=14074.0); [OpenDroneMap forum](https://community.opendronemap.org/t/dji-ppk-file-usage/16603) |
+| Lowercase `lat`/`lon` tags and other separators exist | `mrk.rs` | [Skydio X10 RTK/PPK metadata overview](https://support.skydio.com/hc/en-us/articles/32887502774171-Skydio-X10-RTK-PPK-metadata-overview) |
+| Status: 50 fixed, 32 to 49 float, 16 single, 0 none | `mrk.rs` `RtkQuality` | [Mavic 3M Image Processing Guide v1.0](https://dl.djicdn.com/downloads/DJI_Mavic_3_Enterprise/20230829/Mavic_3M_Image_Processing_Guide_EN.pdf); Matrice 4 manual (RtkFlag) |
+
+## Image metadata and time
+
+| Rule | Where | Source |
+|---|---|---|
+| XMP fields `UTCAtExposure` (microsecond precision, `YYYY:MM:DD HH:MM:SS.ffffff`) and `CaptureUUID` | `photo.rs`, `time.rs` | [Mavic 3M User Manual](https://dl.djicdn.com/downloads/DJI_Mavic_3_Enterprise/20240814/DJI_Mavic_3M_User_Manual_EN.pdf); Matrice 4 manual |
+| `UTCAtExposure` measured as GPS time (18 s ahead of UTC) on P1 and L2 data, despite its label; pair on time, not order | `matching.rs` (tries both readings) | [dji-geotagger output.md](https://github.com/geo-raypan/dji-geotagger/blob/main/docs/output.md); [dji-geotagger commits](https://github.com/geo-raypan/dji-geotagger/commits/main) |
+| GPS - UTC = 18 s since 2017-01-01 | `time.rs` | IERS Bulletin C (no leap second since 2017) |
+| XMP in JPEG: APP1 segment starting `http://ns.adobe.com/xap/1.0/\0` | `headers.rs` | Adobe XMP Specification Part 3 |
+| XMP in TIFF: tag 700 (BYTE/UNDEFINED) | `headers.rs` | Adobe XMP Specification Part 3; TIFF 6.0 |
+
+## Mavic 3 Multispectral
+
+| Rule | Where | Source |
+|---|---|---|
+| One trigger writes 1 RGB JPEG + 4 TIFF bands (Green, Red, RedEdge, NIR), sharing `CaptureUUID` | `capture.rs` | [Mavic 3M Image Processing Guide](https://dl.djicdn.com/downloads/DJI_Mavic_3_Enterprise/20230829/Mavic_3M_Image_Processing_Guide_EN.pdf); [Pix4D support](https://support.pix4d.com/hc/en-us/articles/36000014121991) |
+| Band from XMP `BandName`, value `RedEdge` without a space; file names vary (`_MS_G` or `_G`) | `photo.rs` | [m3m_radcal SPEC.md](https://github.com/Eggpl4ntE4ter/m3m_radcal/blob/main/docs/SPEC.md); [uav_pytools](https://github.com/Jeff-Tracey/uav_pytools) |
+| Group on `CaptureUUID`, fall back on file names | `capture.rs` | [OpenDroneMap photo.py](https://raw.githubusercontent.com/OpenDroneMap/ODM/master/opendm/photo.py) |
+| MRK has one line per RGB photo (captures), not per file | `matching.rs` | [Emlid community](https://community.emlid.com/t/ppk-processing-of-multispectral-drone-data/39286); [DJI Terra accuracy notes](https://terra.dji.com/user-manual/ko/accuracy-whitepaper/photogrammetry-accuracy.html) |
+| Radiometric XMP tags must survive any edit; Pillow/ImageMagick/GDAL rewrite or drop metadata | design rule (read-only by default) | Mavic 3M Image Processing Guide; [ImageMagick #1674](https://github.com/ImageMagick/ImageMagick/issues/1674) |
+
+## Folder layout and pitfalls
+
+| Rule | Where | Source |
+|---|---|---|
+| Raw GNSS log is RTCM 3.2: `*_PPKRAW.bin` (Mavic 3E/3M, P1), `*.RTK` (Matrice 4, M400) | `scan.rs` `aux_kind` | Manuals above; [MatricePilots](https://matricepilots.com/threads/what-are-these-file-types.25895) |
+| New folder every 999 photos; GNSS log closes a few seconds early | `scan.rs` (`folder_split`) | [dji-geotagger pipeline.md](https://github.com/geo-raypan/dji-geotagger/blob/main/docs/pipeline.md) |
+| Folders that do not start at 0001 break order-based pairing | `scan.rs`, `matching.rs` | [dji-geotagger releases](https://github.com/geo-raypan/dji-geotagger/releases) |
+| On-board RINEX seen with 1980 dates or missing constellation letters | `scan.rs` (`no_raw_log`) | [Emlid community](https://community.emlid.com/t/ppk-processing-failed/35293) |

@@ -1,0 +1,19 @@
+[package]
+name = "azimut-cli"
+description = "Command-line interface for Azimut, an open-source PPK geotagging toolkit for DJI drones."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "azimut"
+path = "src/main.rs"
+
+[dependencies]
+azimut-io = { workspace = true, features = ["synthetic"] }
+anyhow.workspace = true
+clap.workspace = true
+serde_json.workspace = true
