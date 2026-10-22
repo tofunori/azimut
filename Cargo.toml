@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/azimut-io", "crates/azimut-cli"]
+members = ["crates/azimut-io", "crates/azimut-solve", "crates/azimut-export", "crates/azimut-cli"]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,6 +12,8 @@ authors = ["Azimut contributors"]
 
 [workspace.dependencies]
 azimut-io = { path = "crates/azimut-io", version = "0.1.0" }
+azimut-solve = { path = "crates/azimut-solve", version = "0.1.0" }
+azimut-export = { path = "crates/azimut-export", version = "0.1.0" }
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 quick-xml = "0.37"
 rayon = "1.10"

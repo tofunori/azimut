@@ -189,7 +189,7 @@ fn v2_epoch_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     // RINEX 2 epoch line: " yy mm dd hh mm ss.sssssss  f nnn" followed by satellites.
     RE.get_or_init(|| {
-        Regex::new(r"^ (\d{2}) ([ \d]\d) ([ \d]\d) ([ \d]\d) ([ \d]\d) ([ \d]\d\.\d{7})  (\d)([ \d]{3})((?:[GRESJCI ]\d{2})*)")
+        Regex::new(r"^ (\d{2}) ([ \d]\d) ([ \d]\d) ([ \d]\d) ([ \d]\d) ([ \d]\d\.\d{7})  (\d)([ \d]{3})((?:[GRESJCI ][ \d]\d)*)")
             .expect("valid regex")
     })
 }

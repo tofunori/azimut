@@ -1,0 +1,19 @@
+[package]
+name = "azimut-solve"
+description = "PPK processing for Azimut: drives RTKLIB-EX, reads its solutions, and computes camera centres from DJI MRK lever arms."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+azimut-io.workspace = true
+chrono.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+azimut-io = { workspace = true, features = ["synthetic"] }
+tempfile.workspace = true

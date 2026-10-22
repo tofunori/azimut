@@ -1,0 +1,16 @@
+[package]
+name = "azimut-export"
+description = "Writers for Azimut camera positions: CSV for Metashape/Pix4D and geo.txt for OpenDroneMap."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+azimut-io.workspace = true
+azimut-solve.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

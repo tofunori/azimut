@@ -197,7 +197,12 @@ pub fn write_flight(dir: &Path, spec: &SyntheticFlight) -> io::Result<Vec<PathBu
             gps
         };
         let uuid = pseudo_uuid(index as u64 ^ (spec.start_gps_s as u64));
-        let mut base: Vec<(&str, String)> = vec![("UTCAtExposure", format_dji_clock(clock))];
+        let mut base: Vec<(&str, String)> = vec![
+            ("UTCAtExposure", format_dji_clock(clock)),
+            ("GimbalYawDegree", "+0.50".into()),
+            ("GimbalPitchDegree", "-90.00".into()),
+            ("GimbalRollDegree", "+0.00".into()),
+        ];
         if spec.with_uuid {
             base.push(("CaptureUUID", uuid));
         }

@@ -76,6 +76,8 @@ pub struct Photo {
     pub bytes_read: u64,
     /// XMP `CaptureUUID`, shared by all images of one Mavic 3M capture.
     pub capture_uuid: Option<String>,
+    /// XMP `GimbalYawDegree`, `GimbalPitchDegree`, `GimbalRollDegree`, degrees.
+    pub gimbal_ypr_deg: Option<[f64; 3]>,
     /// Raw XMP `UTCAtExposure` string.
     pub exposure_raw: Option<String>,
     /// `UTCAtExposure` as seconds since the GPS epoch, read "as written".
@@ -171,6 +173,19 @@ pub fn read_photo(path: &Path) -> Photo {
         .get_local("CaptureUUID")
         .map(str::to_string)
         .filter(|s| !s.is_empty());
+    let angle = |k: &str| {
+        fields
+            .get_local(k)
+            .and_then(|v| v.trim().trim_start_matches('+').parse::<f64>().ok())
+    };
+    let gimbal_ypr_deg = match (
+        angle("GimbalYawDegree"),
+        angle("GimbalPitchDegree"),
+        angle("GimbalRollDegree"),
+    ) {
+        (Some(y), Some(p), Some(r)) => Some([y, p, r]),
+        _ => None,
+    };
     let error = error.or_else(|| {
         if fields.qualified.is_empty() {
             Some("no XMP metadata found".to_string())
@@ -186,6 +201,7 @@ pub fn read_photo(path: &Path) -> Photo {
         size,
         bytes_read,
         capture_uuid,
+        gimbal_ypr_deg,
         exposure_raw,
         exposure_clock_s,
         sequence,

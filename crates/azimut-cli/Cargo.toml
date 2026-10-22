@@ -17,3 +17,5 @@ azimut-io = { workspace = true, features = ["synthetic"] }
 anyhow.workspace = true
 clap.workspace = true
 serde_json.workspace = true
+azimut-solve.workspace = true
+azimut-export.workspace = true

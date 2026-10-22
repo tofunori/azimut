@@ -55,3 +55,31 @@ or interface text of closed-source tools as a source.
 | A 30 s base is too coarse for a 5 Hz drone log | `scan.rs` (`base_interval`) | [Emlid community](https://community.emlid.com/t/ppk-processing-failed/35293) |
 | DJI accuracy specification adds 1 ppm of the baseline | `scan.rs` (`base_far`) | [DJI M350 RTK specs](https://enterprise.dji.com/matrice-350-rtk/specs); [Taddia et al. 2020](https://www.mdpi.com/2504-446X/4/2/9) |
 | Record the base before take-off and after landing | `scan.rs` (`base_short_margin`) | [REDcatch support: floats](https://redcatch.freshdesk.com/support/solutions/articles/103000382548-what-to-do-if-you-receive-many-floats) (public support article) |
+
+## RTKLIB-EX (PPK engine)
+
+Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](https://github.com/rtklibexplorer/RTKLIB).
+
+| Rule | Where | Source |
+|---|---|---|
+| Options file keys and value names (`pos1-*`, `pos2-*`, `out-*`, `ant2-*`, `misc-timeinterp`) | `config.rs` | `src/options.c` |
+| `ant2-anttype=*` takes antenna type and offsets from the RINEX header | `config.rs` | `src/postpos.c` |
+| ECEF solution line: x y z Q ns sdx sdy sdz sdxy sdyz sdzx age ratio; covariances written as signed square roots | `pos.rs` | `src/solution.c` (`outecef`, `sqvar`) |
+| Solution status codes 1 fix, 2 float, 3 SBAS, 4 DGPS, 5 single, 6 PPP, 7 dead reckoning | `pos.rs` | `src/rtklib.h` (`SOLQ_*`) |
+| `rnx2rtkp -k conf -o out rover base nav...` | `rtklib.rs` | `app/consapp/rnx2rtkp/rnx2rtkp.c` |
+| `convbin -r rtcm3 -tr y/m/d h:m:s -v 3.04 -od -os -o obs -n nav` (RTCM 3 needs an approximate date) | `rtklib.rs` | `app/consapp/convbin/convbin.c` |
+
+## Camera centre
+
+| Rule | Where | Source |
+|---|---|---|
+| Interpolate the antenna to the exposure time, then add the lever arm rotated from NED to ECEF at that position; no extrapolation | `camera.rs` | [dji-geotagger pipeline.md](https://github.com/geo-raypan/dji-geotagger/blob/main/docs/pipeline.md) |
+| Check: camera height = antenna height minus the Down offset | `camera.rs` (`height_check_m`) | Same |
+| GRS80 ellipsoid (ITRF, NAD83) | `geodesy.rs` | Moritz (1980), Geodetic Reference System 1980 |
+
+## Outputs
+
+| Rule | Where | Source |
+|---|---|---|
+| OpenDroneMap `geo.txt`: projection line, then `image geo_x geo_y geo_z [yaw pitch roll] [horizontal vertical accuracy]`; angles are used for radiometric calibration | `azimut-export` | [ODM documentation, geo.txt](https://docs.opendronemap.org/geo/) |
+| Gimbal angles in XMP `drone-dji:GimbalYawDegree`, `GimbalPitchDegree`, `GimbalRollDegree` | `photo.rs` | [Matrice 4 Series User Manual](https://dl.djicdn.com/downloads/DJI_Matrice_4_Series/DJI_Matrice_4_Series_User_Manual_en.pdf); [Mavic 3M Image Processing Guide](https://dl.djicdn.com/downloads/DJI_Mavic_3_Enterprise/20230829/Mavic_3M_Image_Processing_Guide_EN.pdf) |

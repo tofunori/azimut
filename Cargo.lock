@@ -78,9 +78,20 @@ name = "azimut-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "azimut-export",
  "azimut-io",
+ "azimut-solve",
  "clap",
  "serde_json",
+]
+
+[[package]]
+name = "azimut-export"
+version = "0.1.0"
+dependencies = [
+ "azimut-io",
+ "azimut-solve",
+ "tempfile",
 ]
 
 [[package]]
@@ -97,6 +108,17 @@ dependencies = [
  "tempfile",
  "thiserror",
  "walkdir",
+]
+
+[[package]]
+name = "azimut-solve"
+version = "0.1.0"
+dependencies = [
+ "azimut-io",
+ "chrono",
+ "serde",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]

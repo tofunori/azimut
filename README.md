@@ -3,10 +3,12 @@
 Open-source PPK geotagging for DJI survey drones, built for research use: fast on large
 multispectral datasets, explicit about reference frames, and validated against ground truth.
 
-> **Status: early development.** The first module, `azimut-io`, reads and diagnoses DJI
-> flight folders. PPK solving, coordinate transformation and exports come next (see Roadmap).
-> Everything so far is tested on synthetic data built from public DJI documentation; it
-> still has to be confirmed on real SD-card copies.
+> **Status: early development.** Azimut scans and diagnoses DJI flight folders, runs PPK
+> through RTKLIB-EX, computes camera centres with the MRK lever arm, and writes CSV and
+> OpenDroneMap files (Mavic 3M bands included). Coordinate transformations (NAD83(CSRS),
+> CGVD2013) and the quality report come next. Everything is tested on synthetic data built
+> from public DJI documentation and with stand-in RTKLIB programs; it still has to be
+> confirmed on real SD-card copies and against checkpoints.
 
 *En bref (français) : Azimut est un outil libre de géotag PPK pour les drones DJI, développé
 au GlacioLab (UQTR). Le moteur est en Rust, lit seulement les en-têtes des images (aucun
@@ -49,6 +51,48 @@ cargo build --release
 # With a base station recorded elsewhere (file or folder, RINEX 2/3/4, Hatanaka headers)
 ./target/release/azimut scan /path/to/DCIM --base /path/to/base.26o
 ```
+
+### PPK processing
+
+Azimut drives [RTKLIB-EX](https://github.com/rtklibexplorer/RTKLIB) (BSD-2), which it does
+not ship. Build its console programs `convbin` and `rnx2rtkp` (for example with `make` in
+`app/consapp/convbin/gcc` and `app/consapp/rnx2rtkp/gcc`, or use the Windows release
+binaries), then point Azimut at them:
+
+```sh
+./target/release/azimut process /path/to/campaign \
+    --rtklib /path/to/rtklib/bin \
+    --base /path/to/base.26o \
+    --base-llh 46.3491234,-72.5512345,31.204 \
+    --antenna-height 1.800 \
+    --frame "NAD83(CSRS) v8, epoch 2010.0" \
+    --out results
+```
+
+For each flight folder, `process` converts the aircraft's raw RTCM 3 log to RINEX 3.04
+(`convbin`), runs a kinematic, forward/backward-combined PPK against the base
+(`rnx2rtkp`, options file kept in `results/work/`), interpolates the antenna to each MRK
+exposure (never extrapolating, and refusing gaps over 1 s), adds the MRK lever arm, and
+writes:
+
+| File | Content |
+|---|---|
+| `<flight>_positions.csv` | One row per image file (JPEG and Mavic 3M bands): latitude, longitude, ellipsoidal height, 1-sigma E/N/U, fix status, satellites, frame. Imports into Metashape and Pix4D. `--roles Green` keeps one row per capture for a Metashape multi-camera master band. |
+| `<flight>_geo.txt` | OpenDroneMap `geo.txt` (EPSG:4326, ellipsoidal heights), with DJI gimbal yaw/pitch/roll and horizontal/vertical accuracy when the image carries gimbal angles. ODM uses those angles for radiometric calibration, so they are never set to zero. |
+| `<flight>_problems.csv` | Exposures without a position, and why. |
+| `<flight>_solution.json` | Everything above plus the trajectory statistics and file paths. |
+
+Coordinates are in the frame of the base coordinates you give. Without `--base-llh`, the
+approximate position from the base RINEX header is used: positions are then precise
+relative to each other but not in absolute terms. Heights are ellipsoidal; orthometric
+heights (CGVD2013) come with `azimut-geo`.
+
+Defaults for DJI aircraft: L1+L2, GPS + GLONASS + Galileo + BeiDou, 15° mask, continuous
+ambiguity resolution with ratio 3, GLONASS ambiguities left float (base and drone receivers
+come from different makers), base observations interpolated to the 5 Hz drone epochs.
+`--no-beidou` drops BeiDou for logs with reported decoding problems (Matrice 4).
+
+### RINEX checks
 
 RINEX files are summarised from their header, first epochs and last epoch only, so large
 base files are checked in milliseconds. RINEX observation files found in the scanned tree
@@ -107,11 +151,13 @@ manuals. Tested so far on synthetic data only.
 1. **`azimut-io`** (this release): header readers, MRK, RINEX summaries, inventory, Mavic 3M
    grouping, pairing, base coverage, diagnosis. Next: local metadata index, folder-split
    merging, gzip support.
-2. **`azimut-solve`**: RTKLIB-EX `convbin` / `rnx2rtkp`, per-drone profiles, forward/backward.
-3. **`azimut-geo`**: lever arm (NED to ECEF per exposure), NAD83(CSRS) with epoch, CGVD2013,
-   refusal of approximate transformations.
-4. **`azimut-export`**: ODM `geo.txt`, Metashape and Pix4D CSV (one row per file and a
-   master-band variant), optional in-place writing with ExifTool.
+2. **`azimut-solve`** (this release): RTKLIB-EX `convbin` / `rnx2rtkp`, combined filter,
+   ECEF solutions with full covariance, interpolation, MRK lever arm. Next: per-drone
+   profiles tested on real logs, merging logs split at 999 photos, CSRS-PPP base position.
+3. **`azimut-geo`**: NAD83(CSRS) with epoch, CGVD2013, refusal of approximate
+   transformations.
+4. **`azimut-export`** (this release: CSV, ODM `geo.txt`): camera angles and accuracy in
+   `geo.txt`, Pix4D-specific CSV, optional in-place writing with ExifTool.
 5. **`azimut-report`**: quality report (fix rate, uncertainty map, base distance).
 6. **App**: native desktop interface (GPUI).
 7. **Validation**: checkpoints (ASPRS Ed. 2), comparison with other tools, open test dataset.
