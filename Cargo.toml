@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
 license = "BSD-2-Clause"
-repository = "https://github.com/OWNER/azimut"
+repository = "https://github.com/tofunori/azimut"
 authors = ["Azimut contributors"]
 
 [workspace.dependencies]
