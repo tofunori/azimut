@@ -5,7 +5,7 @@ members = ["crates/azimut-io", "crates/azimut-cli"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.82"
 license = "BSD-2-Clause"
 repository = "https://github.com/tofunori/azimut"
 authors = ["Azimut contributors"]

@@ -17,6 +17,7 @@ use crate::capture::{group, Capture};
 use crate::matching::{match_on_time, ClockReading, MatchResult, DEFAULT_TOLERANCE_S};
 use crate::mrk::{self, MrkLineError, MrkRecord, RtkQuality};
 use crate::photo::{ext, is_jpeg, is_tiff, read_photo, Photo};
+use crate::rinex::{self, distance_m, geodetic_to_ecef, Compression, EpochSource, RinexKind, RinexSummary};
 
 /// Non-image files that matter for PPK.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -36,23 +37,19 @@ pub enum AuxKind {
 
 /// Classify a non-image file by extension and name. Case is ignored.
 pub fn aux_kind(path: &Path) -> Option<AuxKind> {
+    if rinex::is_obs_name(path) {
+        return Some(AuxKind::RinexObs);
+    }
+    if rinex::is_nav_name(path) {
+        return Some(AuxKind::RinexNav);
+    }
     let e = ext(path)?;
     let name = path.file_name()?.to_string_lossy().to_ascii_lowercase();
-    let rinex_obs =
-        e == "obs" || (e.len() == 3 && e.ends_with('o') && e[..2].chars().all(|c| c.is_ascii_digit()));
-    let rinex_nav = e == "nav"
-        || e == "rnx" && name.contains("_mn")
-        || (e.len() == 3
-            && e[..2].chars().all(|c| c.is_ascii_digit())
-            && matches!(&e[2..], "n" | "g" | "l" | "p" | "c"));
     match e.as_str() {
         "mrk" => Some(AuxKind::Mrk),
         "rtk" => Some(AuxKind::RawGnss),
         "bin" if name.contains("ppkraw") => Some(AuxKind::RawGnss),
         "dat" | "rtb" => Some(AuxKind::BaseLog),
-        "rnx" if name.contains("_mo") => Some(AuxKind::RinexObs),
-        _ if rinex_obs => Some(AuxKind::RinexObs),
-        _ if rinex_nav => Some(AuxKind::RinexNav),
         _ => None,
     }
 }
@@ -108,7 +105,26 @@ pub struct Flight {
     pub mrk_errors: Vec<(usize, MrkLineError)>,
     pub quality: QualityCounts,
     pub matching: MatchResult,
+    /// Indices into `ScanReport::rinex` of observation files found in this folder.
+    pub rover_rinex: Vec<usize>,
+    /// Base station chosen for this flight, if any.
+    pub base: Option<BaseCheck>,
     pub findings: Vec<Finding>,
+}
+
+/// How a base-station RINEX file covers a flight.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaseCheck {
+    /// Index into `ScanReport::rinex`.
+    pub rinex: usize,
+    /// Base start before the first exposure, seconds (negative: starts after it).
+    pub margin_before_s: Option<f64>,
+    /// Base end after the last exposure, seconds (negative: ends before it).
+    pub margin_after_s: Option<f64>,
+    /// Exposures outside the base recording.
+    pub exposures_outside: usize,
+    /// Distance from the base to the first exposure, km.
+    pub distance_km: Option<f64>,
 }
 
 impl Flight {
@@ -122,6 +138,8 @@ impl Flight {
 pub struct ScanReport {
     pub root: PathBuf,
     pub flights: Vec<Flight>,
+    /// Every RINEX observation file found under the root or given as a base.
+    pub rinex: Vec<RinexSummary>,
     pub files_seen: usize,
     pub images: usize,
     pub bytes_on_disk: u64,
@@ -134,6 +152,8 @@ pub struct ScanOptions {
     pub tolerance_s: f64,
     /// Skip hidden files and folders (names starting with `.`).
     pub skip_hidden: bool,
+    /// Base-station RINEX files, or folders holding them, outside the scanned tree.
+    pub base: Vec<PathBuf>,
 }
 
 impl Default for ScanOptions {
@@ -141,6 +161,7 @@ impl Default for ScanOptions {
         Self {
             tolerance_s: DEFAULT_TOLERANCE_S,
             skip_hidden: true,
+            base: Vec::new(),
         }
     }
 }
@@ -184,12 +205,51 @@ pub fn scan(root: &Path, opts: &ScanOptions) -> ScanReport {
     }
     dirs.sort();
 
+    // RINEX observation files: in the tree and given as bases.
+    let mut obs_paths: Vec<PathBuf> = aux
+        .values()
+        .flat_map(|k| k.get(&AuxKind::RinexObs).cloned().unwrap_or_default())
+        .collect();
+    let mut explicit_base: Vec<PathBuf> = Vec::new();
+    for b in &opts.base {
+        if b.is_dir() {
+            for e in WalkDir::new(b).into_iter().filter_map(Result::ok) {
+                if e.file_type().is_file() && rinex::is_obs_name(e.path()) {
+                    explicit_base.push(e.into_path());
+                }
+            }
+        } else {
+            explicit_base.push(b.clone());
+        }
+    }
+    obs_paths.extend(explicit_base.iter().cloned());
+    obs_paths.sort();
+    obs_paths.dedup();
+    let rinex_all: Vec<RinexSummary> = obs_paths.par_iter().map(|p| rinex::summarize(p)).collect();
+    let nav_anywhere = aux.values().any(|k| k.contains_key(&AuxKind::RinexNav));
+
+    // Base candidates: observation files outside flight folders, or given explicitly.
+    let base_idx: Vec<usize> = rinex_all
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| {
+            let parent = r.path.parent().map(Path::to_path_buf).unwrap_or_default();
+            explicit_base.contains(&r.path) || !dirs.contains(&parent)
+        })
+        .map(|(i, _)| i)
+        .collect();
+
     let flights: Vec<Flight> = dirs
         .into_iter()
         .map(|dir| {
             let imgs = images.remove(&dir).unwrap_or_default();
             let aux = aux.remove(&dir).unwrap_or_default();
-            build_flight(dir, imgs, aux, opts)
+            let ctx = RinexContext {
+                all: &rinex_all,
+                base: &base_idx,
+                nav_anywhere,
+            };
+            build_flight(dir, imgs, aux, opts, &ctx)
         })
         .collect();
 
@@ -199,6 +259,7 @@ pub fn scan(root: &Path, opts: &ScanOptions) -> ScanReport {
     ScanReport {
         root: root.to_path_buf(),
         flights,
+        rinex: rinex_all,
         files_seen,
         images: images_n,
         bytes_on_disk,
@@ -207,11 +268,18 @@ pub fn scan(root: &Path, opts: &ScanOptions) -> ScanReport {
     }
 }
 
+struct RinexContext<'a> {
+    all: &'a [RinexSummary],
+    base: &'a [usize],
+    nav_anywhere: bool,
+}
+
 fn build_flight(
     dir: PathBuf,
     image_paths: Vec<PathBuf>,
     aux: BTreeMap<AuxKind, Vec<PathBuf>>,
     opts: &ScanOptions,
+    rx: &RinexContext<'_>,
 ) -> Flight {
     // Headers only, in parallel.
     let photos: Vec<Photo> = image_paths.par_iter().map(|p| read_photo(p)).collect();
@@ -260,9 +328,13 @@ fn build_flight(
         mrk_errors,
         quality,
         matching,
+        rover_rinex: Vec::new(),
+        base: None,
         findings,
     };
     diagnose(&mut flight);
+    check_rinex(&mut flight, rx);
+    flight.findings.sort_by_key(|x| std::cmp::Reverse(x.severity));
     flight
 }
 
@@ -459,6 +531,228 @@ fn diagnose(f: &mut Flight) {
         }
     }
 
-    out.sort_by_key(|x| std::cmp::Reverse(x.severity));
     f.findings = out;
+}
+
+/// Checks on the rover and base RINEX files of one flight.
+fn check_rinex(f: &mut Flight, rx: &RinexContext<'_>) {
+    let mut out = Vec::new();
+    f.rover_rinex = rx
+        .all
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.path.parent() == Some(f.dir.as_path()))
+        .map(|(i, _)| i)
+        .collect();
+
+    // Rover observation files written on board.
+    for &i in &f.rover_rinex {
+        let r = &rx.all[i];
+        let name = file_name(&r.path);
+        if let Some(e) = &r.error {
+            out.push(finding(
+                Severity::Warning,
+                "rinex_unreadable",
+                format!("{name}: {e}"),
+            ));
+            continue;
+        }
+        if r.first_epoch_s.is_some_and(|t| t < GPS_2000_S) {
+            out.push(finding(Severity::Warning, "rinex_1980", format!("{name}: first epoch is dated before 2000 (receiver time not yet set). Convert the raw log instead of using this file.")));
+        }
+        if r.single_frequency() {
+            out.push(finding(
+                Severity::Info,
+                "rover_single_frequency",
+                format!("{name}: single-frequency observations ({}).", r.bands_label()),
+            ));
+        }
+    }
+
+    let n_nav = f.aux_files(AuxKind::RinexNav).len();
+    if !f.mrk.is_empty() && n_nav == 0 && !rx.nav_anywhere {
+        out.push(finding(
+            Severity::Warning,
+            "no_nav",
+            "No RINEX navigation file found: PPK needs broadcast or precise orbits.",
+        ));
+    }
+
+    // Base station.
+    let span = match (f.mrk.first(), f.mrk.last()) {
+        (Some(a), Some(b)) => Some((a.record.gps_seconds(), b.record.gps_seconds())),
+        _ => None,
+    };
+    let Some((start, end)) = span else {
+        f.findings.extend(out);
+        return;
+    };
+    let candidates: Vec<usize> = rx
+        .base
+        .iter()
+        .copied()
+        .filter(|&i| rx.all[i].kind != Some(RinexKind::Navigation))
+        .collect();
+    if candidates.is_empty() {
+        out.push(finding(
+            Severity::Info,
+            "no_base",
+            "No base-station RINEX found next to this flight. Give one with --base to check its coverage.",
+        ));
+        f.findings.extend(out);
+        return;
+    }
+    let overlap = |r: &RinexSummary| match (r.first_epoch_s, r.last_epoch_s) {
+        (Some(a), Some(b)) => {
+            (b.min(end) - a.max(start)).max(0.0) + if a <= start && b >= end { 1.0 } else { 0.0 }
+        }
+        _ => -1.0,
+    };
+    let best = candidates
+        .iter()
+        .copied()
+        .max_by(|&a, &b| overlap(&rx.all[a]).total_cmp(&overlap(&rx.all[b])))
+        .expect("non-empty");
+    let r = &rx.all[best];
+    let name = file_name(&r.path);
+
+    if r.compression == Compression::Archive {
+        out.push(finding(
+            Severity::Warning,
+            "base_compressed",
+            format!("Base {name} is compressed; decompress it so its coverage can be checked."),
+        ));
+        f.findings.extend(out);
+        return;
+    }
+    if let Some(e) = &r.error {
+        out.push(finding(
+            Severity::Warning,
+            "base_unreadable",
+            format!("Base {name}: {e}"),
+        ));
+        f.findings.extend(out);
+        return;
+    }
+    let (Some(b0), Some(b1)) = (r.first_epoch_s, r.last_epoch_s) else {
+        out.push(finding(
+            Severity::Warning,
+            "base_no_times",
+            format!("Base {name}: no epoch times found; coverage not checked."),
+        ));
+        f.findings.extend(out);
+        return;
+    };
+    if overlap(r) <= 0.0 {
+        out.push(finding(
+            Severity::Error,
+            "base_no_overlap",
+            format!(
+                "No base file covers this flight ({} candidate(s); closest: {name}).",
+                candidates.len()
+            ),
+        ));
+        f.findings.extend(out);
+        return;
+    }
+
+    let outside = f
+        .mrk
+        .iter()
+        .filter(|e| {
+            let t = e.record.gps_seconds();
+            t < b0 || t > b1
+        })
+        .count();
+    let distance_km = r.approx_xyz_m.zip(f.mrk.first()).map(|(xyz, e)| {
+        let p = geodetic_to_ecef(e.record.lat_deg, e.record.lon_deg, e.record.ellh_m);
+        distance_m(xyz, p) / 1000.0
+    });
+    f.base = Some(BaseCheck {
+        rinex: best,
+        margin_before_s: Some(start - b0),
+        margin_after_s: Some(b1 - end),
+        exposures_outside: outside,
+        distance_km,
+    });
+
+    let mut base_line = format!("Base {name}: {}", r.bands_label());
+    if let Some(d) = distance_km {
+        base_line.push_str(&format!(", {d:.1} km from the flight"));
+    }
+    if let Some(i) = r.interval_s {
+        base_line.push_str(&format!(", every {i} s"));
+    }
+    if r.epochs_from == EpochSource::Header {
+        base_line.push_str(" (times from the header)");
+    }
+    out.push(finding(Severity::Info, "base", base_line));
+
+    if outside > 0 {
+        out.push(finding(
+            Severity::Error,
+            "base_partial",
+            format!("{outside} exposure(s) fall outside the base recording ({name}); they cannot be solved."),
+        ));
+    } else if start - b0 < 60.0 || b1 - end < 60.0 {
+        out.push(finding(Severity::Warning, "base_short_margin", format!("The base starts {:.0} s before the first photo and ends {:.0} s after the last one. Record a few minutes before take-off and after landing.", start - b0, b1 - end)));
+    }
+    if r.interval_s.is_some_and(|i| i > 1.0) {
+        out.push(finding(
+            Severity::Warning,
+            "base_interval",
+            format!(
+                "Base records every {} s while the drone logs at 5 Hz; a 1 s (or faster) base is preferable.",
+                r.interval_s.unwrap_or_default()
+            ),
+        ));
+    }
+    if r.single_frequency() {
+        out.push(finding(
+            Severity::Warning,
+            "base_single_frequency",
+            "Base has single-frequency observations only: ambiguity fixing will be slower and weaker.",
+        ));
+    }
+    if r.antenna_type.is_none() {
+        out.push(finding(
+            Severity::Warning,
+            "base_antenna_type",
+            "No antenna type in the base header: antenna phase-centre corrections cannot be applied.",
+        ));
+    }
+    if r.antenna_delta_hen_m.is_none_or(|d| d[0] == 0.0) {
+        out.push(finding(Severity::Info, "base_antenna_height", "Antenna height is 0 or missing in the base header: the base position will refer to the antenna, not the ground mark, unless entered by hand."));
+    }
+    if let Some(d) = distance_km {
+        if d > 30.0 {
+            out.push(finding(
+                Severity::Warning,
+                "base_far",
+                format!(
+                    "Base is {d:.0} km away: at about 1 ppm, the baseline alone adds roughly {:.0} cm.",
+                    d / 10.0
+                ),
+            ));
+        }
+    }
+    if let Some(ts) = &r.time_system {
+        if !ts.eq_ignore_ascii_case("GPS") {
+            out.push(finding(
+                Severity::Warning,
+                "base_time_system",
+                format!("Base epochs are in {ts} time, not GPS; coverage is approximate."),
+            ));
+        }
+    }
+    f.findings.extend(out);
+}
+
+/// 2000-01-01 00:00:00 as seconds since the GPS epoch (ignoring leap seconds).
+const GPS_2000_S: f64 = 630_720_000.0;
+
+fn file_name(p: &Path) -> String {
+    p.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }

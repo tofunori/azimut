@@ -240,9 +240,156 @@ pub fn write_flight(dir: &Path, spec: &SyntheticFlight) -> io::Result<Vec<PathBu
     let mrk_path = dir.join(format!("DJI_{first_stamp}_Timestamp.MRK"));
     fs::write(&mrk_path, mrk)?;
     written.push(mrk_path);
-    // Placeholder raw GNSS log: empty, only its presence is checked by `scan`.
+    // Placeholder raw GNSS log and navigation file: empty, only their presence is checked.
     let raw = dir.join(format!("DJI_{first_stamp}_PPKRAW.bin"));
     fs::write(&raw, b"")?;
     written.push(raw);
+    let nav = dir.join(format!("DJI_{first_stamp}_PPKNAV.nav"));
+    fs::write(&nav, b"")?;
+    written.push(nav);
     Ok(written)
+}
+
+/// Description of a synthetic RINEX observation file.
+#[derive(Debug, Clone)]
+pub struct SyntheticRinex {
+    /// 2 or 3.
+    pub major_version: u8,
+    pub start_gps_s: f64,
+    pub end_gps_s: f64,
+    pub interval_s: f64,
+    /// Write the `INTERVAL` header record.
+    pub interval_in_header: bool,
+    /// Observation codes per system for RINEX 3 (e.g. `('G', &["C1C", "L1C", "C2W", "L2W"])`);
+    /// for RINEX 2 the codes of the first entry are used for every system.
+    pub codes: Vec<(char, Vec<&'static str>)>,
+    pub antenna_type: Option<&'static str>,
+    pub antenna_height_m: f64,
+    /// Approximate position as latitude, longitude (degrees) and ellipsoidal height (m).
+    pub approx_llh: Option<(f64, f64, f64)>,
+}
+
+impl Default for SyntheticRinex {
+    fn default() -> Self {
+        let flight = SyntheticFlight::default();
+        Self {
+            major_version: 3,
+            start_gps_s: flight.start_gps_s - 600.0,
+            end_gps_s: flight.start_gps_s + 1800.0,
+            interval_s: 1.0,
+            interval_in_header: true,
+            codes: vec![
+                ('G', vec!["C1C", "L1C", "C2W", "L2W"]),
+                ('R', vec!["C1C", "L1C", "C2P", "L2P"]),
+                ('E', vec!["C1C", "L1C", "C5Q", "L5Q"]),
+            ],
+            antenna_type: Some("EMLIDREACHRS4   NONE"),
+            antenna_height_m: 1.8,
+            approx_llh: Some((46.3490, -72.5510, 60.0)),
+        }
+    }
+}
+
+fn hdr(content: &str, label: &str) -> String {
+    format!("{content:<60}{label:<20}\n")
+}
+
+/// Write a small RINEX observation file (only epoch lines and dummy observation lines).
+pub fn write_rinex(path: &Path, spec: &SyntheticRinex) -> io::Result<()> {
+    use crate::rinex::geodetic_to_ecef;
+    let v3 = spec.major_version >= 3;
+    let mut s = String::new();
+    let (ver, sys) = if v3 {
+        ("     3.04", "M")
+    } else {
+        ("     2.11", "M")
+    };
+    s += &hdr(
+        &format!("{ver}           OBSERVATION DATA    {sys}"),
+        "RINEX VERSION / TYPE",
+    );
+    s += &hdr("azimut synthetic", "PGM / RUN BY / DATE");
+    s += &hdr("BASE", "MARKER NAME");
+    s += &hdr(
+        &format!("{:<20}{:<20}{:<20}", "0001", "SYNTH RECEIVER", "1.0"),
+        "REC # / TYPE / VERS",
+    );
+    s += &hdr(
+        &format!("{:<20}{:<20}", "0001", spec.antenna_type.unwrap_or("")),
+        "ANT # / TYPE",
+    );
+    if let Some((lat, lon, h)) = spec.approx_llh {
+        let p = geodetic_to_ecef(lat, lon, h);
+        s += &hdr(
+            &format!("{:14.4}{:14.4}{:14.4}", p[0], p[1], p[2]),
+            "APPROX POSITION XYZ",
+        );
+    }
+    s += &hdr(
+        &format!("{:14.4}{:14.4}{:14.4}", spec.antenna_height_m, 0.0, 0.0),
+        "ANTENNA: DELTA H/E/N",
+    );
+    if v3 {
+        for (sys, codes) in &spec.codes {
+            let mut line = format!("{sys}  {:3}", codes.len());
+            for c in codes {
+                line += &format!(" {c:<3}");
+            }
+            s += &hdr(&line, "SYS / # / OBS TYPES");
+        }
+    } else {
+        let codes: Vec<String> = spec.codes[0].1.iter().map(|c| c[..2].to_string()).collect();
+        let mut line = format!("{:6}", codes.len());
+        for c in &codes {
+            line += &format!("    {c:<2}");
+        }
+        s += &hdr(&line, "# / TYPES OF OBSERV");
+    }
+    if spec.interval_in_header {
+        s += &hdr(&format!("{:10.3}", spec.interval_s), "INTERVAL");
+    }
+    let t0 = datetime_from_gps_seconds(spec.start_gps_s);
+    s += &hdr(
+        &format!(
+            "{}     GPS",
+            t0.format("  %Y    %m    %d    %H    %M   %S.0000000")
+        ),
+        "TIME OF FIRST OBS",
+    );
+    s += &hdr("", "END OF HEADER");
+
+    let sats: Vec<String> = spec.codes.iter().map(|(sys, _)| format!("{sys}01")).collect();
+    let mut t = spec.start_gps_s;
+    while t <= spec.end_gps_s + 1e-9 {
+        let dt = datetime_from_gps_seconds(t);
+        if v3 {
+            s += &format!(
+                "> {}  0{:3}\n",
+                dt.format("%Y %m %d %H %M %S.0000000"),
+                sats.len()
+            );
+            for sat in &sats {
+                s += &format!("{sat}  20000000.000   105000000.000\n");
+            }
+        } else {
+            let yy = dt.format("%y").to_string();
+            let fmt = |v: u32| format!("{v:3}");
+            use chrono::{Datelike, Timelike};
+            s += &format!(
+                " {yy}{}{}{}{}{:11.7}  0{:3}{}\n",
+                fmt(dt.month()),
+                fmt(dt.day()),
+                fmt(dt.hour()),
+                fmt(dt.minute()),
+                dt.second() as f64,
+                sats.len(),
+                sats.concat()
+            );
+            for _ in &sats {
+                s += "  20000000.000   105000000.000\n";
+            }
+        }
+        t += spec.interval_s;
+    }
+    fs::write(path, s)
 }

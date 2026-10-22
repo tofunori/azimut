@@ -42,3 +42,16 @@ or interface text of closed-source tools as a source.
 | New folder every 999 photos; GNSS log closes a few seconds early | `scan.rs` (`folder_split`) | [dji-geotagger pipeline.md](https://github.com/geo-raypan/dji-geotagger/blob/main/docs/pipeline.md) |
 | Folders that do not start at 0001 break order-based pairing | `scan.rs`, `matching.rs` | [dji-geotagger releases](https://github.com/geo-raypan/dji-geotagger/releases) |
 | On-board RINEX seen with 1980 dates or missing constellation letters | `scan.rs` (`no_raw_log`) | [Emlid community](https://community.emlid.com/t/ppk-processing-failed/35293) |
+
+## RINEX
+
+| Rule | Where | Source |
+|---|---|---|
+| Header labels in columns 61-80; version/type, antenna, approximate position, interval, time of first/last obs | `rinex.rs` | [RINEX 3.04](https://files.igs.org/pub/data/format/rinex304.pdf); [RINEX 2.11](https://files.igs.org/pub/data/format/rinex211.txt); [RINEX 4.01](https://files.igs.org/pub/data/format/rinex_4.01.pdf) |
+| RINEX 3 epoch lines start with `>`; RINEX 2 epoch lines use two-digit years (80-99 = 19xx) | `rinex.rs` | Same |
+| Observation code second character is the frequency band (`C1C`, `L2W`, `L5Q`) | `rinex.rs` (`bands`) | RINEX 3.04, section 5.1 |
+| Compact RINEX (Hatanaka) keeps a readable RINEX header after two `CRINEX` lines | `rinex.rs` | [Hatanaka 2008, Compact RINEX format](https://terras.gsi.go.jp/ja/crx2rnx/RINEX_HATANAKA.pdf) |
+| File names: `.yyo`/`.yyd`, `_MO.rnx`/`.crx`, `.yyn`/`_MN.rnx` | `rinex.rs` (`is_obs_name`, `is_nav_name`) | RINEX 3.04, section 4 (file naming) |
+| A 30 s base is too coarse for a 5 Hz drone log | `scan.rs` (`base_interval`) | [Emlid community](https://community.emlid.com/t/ppk-processing-failed/35293) |
+| DJI accuracy specification adds 1 ppm of the baseline | `scan.rs` (`base_far`) | [DJI M350 RTK specs](https://enterprise.dji.com/matrice-350-rtk/specs); [Taddia et al. 2020](https://www.mdpi.com/2504-446X/4/2/9) |
+| Record the base before take-off and after landing | `scan.rs` (`base_short_margin`) | [REDcatch support: floats](https://redcatch.freshdesk.com/support/solutions/articles/103000382548-what-to-do-if-you-receive-many-floats) (public support article) |

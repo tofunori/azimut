@@ -7,6 +7,7 @@
 //! - [`headers`]: XMP from JPEG APP1 segments and TIFF tag 700, without reading pixels.
 //! - [`xmp`]: the `drone-dji:` fields Azimut uses.
 //! - [`photo`]: per-image metadata (band, `CaptureUUID`, exposure time, file number).
+//! - [`rinex`]: RINEX header, first and last epoch, without reading the whole file.
 //! - [`capture`]: grouping images of one trigger (Mavic 3M: 1 JPEG + 4 bands).
 //! - [`matching`]: pairing MRK records with captures on time, never on file order.
 //! - [`scan`]: folder inventory and diagnosis before any processing.
@@ -19,6 +20,7 @@ pub mod headers;
 pub mod matching;
 pub mod mrk;
 pub mod photo;
+pub mod rinex;
 pub mod scan;
 pub mod time;
 pub mod xmp;

@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 
 use azimut_io::matching::DEFAULT_TOLERANCE_S;
 use azimut_io::scan::AuxKind;
-use azimut_io::synthetic::{write_flight, SyntheticFlight, M3M_BAND_SIZE};
+use azimut_io::synthetic::{write_flight, write_rinex, SyntheticFlight, SyntheticRinex, M3M_BAND_SIZE};
 use azimut_io::{scan, ScanOptions, ScanReport, Severity};
 
 #[derive(Parser)]
@@ -29,6 +29,15 @@ enum Command {
         /// Pairing tolerance between MRK and image times, seconds.
         #[arg(long, default_value_t = DEFAULT_TOLERANCE_S)]
         tolerance: f64,
+        /// Base-station RINEX file or folder outside DIR (repeatable). RINEX files found
+        /// under DIR outside flight folders are also considered as bases.
+        #[arg(long)]
+        base: Vec<PathBuf>,
+    },
+    /// Write a synthetic RINEX 3 base-station file covering the default demo flight.
+    DemoBase {
+        /// Output file, e.g. base/BASE_MO.rnx
+        file: PathBuf,
     },
     /// Write a synthetic Mavic 3M flight (for trying the tool without real data).
     Demo {
@@ -49,12 +58,18 @@ enum Command {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Scan { dir, json, tolerance } => {
+        Command::Scan {
+            dir,
+            json,
+            tolerance,
+            base,
+        } => {
             anyhow::ensure!(dir.is_dir(), "{} is not a folder", dir.display());
             let report = scan(
                 &dir,
                 &ScanOptions {
                     tolerance_s: tolerance,
+                    base,
                     ..Default::default()
                 },
             );
@@ -70,6 +85,14 @@ fn main() -> Result<()> {
                 .flat_map(|f| &f.findings)
                 .any(|f| f.severity == Severity::Error);
             std::process::exit(if errors { 2 } else { 0 });
+        }
+        Command::DemoBase { file } => {
+            if let Some(parent) = file.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            write_rinex(&file, &SyntheticRinex::default())?;
+            println!("Wrote synthetic base RINEX {} (not real data).", file.display());
+            Ok(())
         }
         Command::Demo {
             dir,
@@ -122,6 +145,12 @@ fn print_report(r: &ScanReport) {
         human_bytes(r.bytes_on_disk),
         human_bytes(r.bytes_read)
     );
+    if !r.rinex.is_empty() {
+        println!(
+            "{} RINEX observation file(s) checked (header, first and last epoch).",
+            r.rinex.len()
+        );
+    }
     for f in &r.flights {
         let rel = f
             .dir

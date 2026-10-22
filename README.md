@@ -46,7 +46,14 @@ cargo build --release
 ./target/release/azimut scan /tmp/m3m-demo
 # Real data: point it at an SD-card copy or a whole campaign folder
 ./target/release/azimut scan /path/to/DCIM --json report.json
+# With a base station recorded elsewhere (file or folder, RINEX 2/3/4, Hatanaka headers)
+./target/release/azimut scan /path/to/DCIM --base /path/to/base.26o
 ```
+
+RINEX files are summarised from their header, first epochs and last epoch only, so large
+base files are checked in milliseconds. RINEX observation files found in the scanned tree
+outside the flight folders are also treated as base candidates; the one that best covers
+each flight is used.
 
 `scan` exits with code 2 when it finds an error that would break a PPK run.
 
@@ -76,6 +83,11 @@ Scanned /tmp/m3m-demo in 0.06 s: 1 flight folder(s), 499 images, 4.0 GB on disk,
 | Real-time fix rate in the MRK | Early warning on GNSS conditions |
 | Photo number 999 reached | DJI splits the folder and the GNSS log ends early |
 | Numbering not starting at 0001 | Interrupted missions; order-based tools fail here |
+| On-board RINEX dated before 2000 | DJI files written before the receiver set its clock |
+| Navigation file present | PPK needs orbits |
+| Base RINEX covers every exposure, with margin | Photos outside the base cannot be solved |
+| Base interval, frequencies, antenna type and height | 30 s or single-frequency bases weaken the solution; a missing antenna type blocks phase-centre corrections |
+| Base distance to the flight | About 1 cm more error per 10 km of baseline |
 
 ## Supported hardware
 
@@ -92,8 +104,9 @@ manuals. Tested so far on synthetic data only.
 
 ## Roadmap
 
-1. **`azimut-io`** (this release): header readers, MRK, inventory, Mavic 3M grouping, pairing,
-   diagnosis. Next: local metadata index, RINEX first-epoch check, folder-split merging.
+1. **`azimut-io`** (this release): header readers, MRK, RINEX summaries, inventory, Mavic 3M
+   grouping, pairing, base coverage, diagnosis. Next: local metadata index, folder-split
+   merging, gzip support.
 2. **`azimut-solve`**: RTKLIB-EX `convbin` / `rnx2rtkp`, per-drone profiles, forward/backward.
 3. **`azimut-geo`**: lever arm (NED to ECEF per exposure), NAD83(CSRS) with epoch, CGVD2013,
    refusal of approximate transformations.
