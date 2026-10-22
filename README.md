@@ -57,7 +57,8 @@ cargo build --release
 Azimut drives [RTKLIB-EX](https://github.com/rtklibexplorer/RTKLIB) (BSD-2), which it does
 not ship. Build its console programs `convbin` and `rnx2rtkp` (for example with `make` in
 `app/consapp/convbin/gcc` and `app/consapp/rnx2rtkp/gcc`, or use the Windows release
-binaries), then point Azimut at them:
+binaries), then point Azimut at them. The `rnx2rtkp` makefile links `libgfortran`, which it
+does not need without LAPACK: if it is not installed, build with `make LDLIBS=-lm`.
 
 ```sh
 ./target/release/azimut process /path/to/campaign \
@@ -79,8 +80,13 @@ writes:
 |---|---|
 | `<flight>_positions.csv` | One row per image file (JPEG and Mavic 3M bands): latitude, longitude, ellipsoidal height, 1-sigma E/N/U, fix status, satellites, frame. Imports into Metashape and Pix4D. `--roles Green` keeps one row per capture for a Metashape multi-camera master band. |
 | `<flight>_geo.txt` | OpenDroneMap `geo.txt` (EPSG:4326, ellipsoidal heights), with DJI gimbal yaw/pitch/roll and horizontal/vertical accuracy when the image carries gimbal angles. ODM uses those angles for radiometric calibration, so they are never set to zero. |
-| `<flight>_problems.csv` | Exposures without a position, and why. |
+| `<flight>_problems.csv` | Exposures without a position, or without an uncertainty, and why. |
 | `<flight>_solution.json` | Everything above plus the trajectory statistics and file paths. |
+
+When RTKLIB writes a covariance that is not positive definite (it prints 0 for a negative
+variance, seen on kinematic solutions), the uncertainty columns are left empty rather than
+written as 0 m, which photogrammetry software would read as a perfect position. The position
+is kept and the exposure is listed in `problems.csv`.
 
 Coordinates are in the frame of the base coordinates you give. Without `--base-llh`, the
 approximate position from the base RINEX header is used: positions are then precise

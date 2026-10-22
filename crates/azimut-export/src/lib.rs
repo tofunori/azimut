@@ -5,7 +5,10 @@
 //! - [`positions_csv`]: one row per image file (all Mavic 3M bands included), with
 //!   1-sigma East/North/Up and the reference frame. Imports into Metashape and Pix4D.
 //! - [`odm_geo_txt`]: OpenDroneMap `geo.txt` (EPSG:4326, ellipsoidal heights).
-//! - [`problems_csv`]: exposures without a camera centre, and why.
+//! - [`problems_csv`]: exposures without a camera centre or without an uncertainty, and why.
+//!
+//! An uncertainty that RTKLIB could not give (covariance not positive definite) is left
+//! empty, never written as 0 m: photogrammetry software would read 0 as a perfect position.
 
 use std::fmt::Write as _;
 
@@ -52,10 +55,14 @@ pub fn positions_csv(sol: &FlightSolution, filter: &RowFilter) -> String {
         };
         let week = (t / SECONDS_PER_WEEK).floor();
         let tow = t - week * SECONDS_PER_WEEK;
+        let sigma = c
+            .sigma_enu_m
+            .map(|[e, n, u]| format!("{e:.4},{n:.4},{u:.4}"))
+            .unwrap_or_else(|| ",,".into());
         for f in e.files.iter().filter(|f| filter.keep(&f.role)) {
             let _ = writeln!(
                 s,
-                "{},{},{},{},{:.6},{:.10},{:.10},{:.4},{:.4},{:.4},{:.4},{},{},{}",
+                "{},{},{},{},{:.6},{:.10},{:.10},{:.4},{},{},{},{}",
                 csv_field(&f.file_name),
                 e.index.map(|i| i.to_string()).unwrap_or_default(),
                 f.role,
@@ -64,9 +71,7 @@ pub fn positions_csv(sol: &FlightSolution, filter: &RowFilter) -> String {
                 c.lat_deg,
                 c.lon_deg,
                 c.h_m,
-                c.sigma_enu_m[0],
-                c.sigma_enu_m[1],
-                c.sigma_enu_m[2],
+                sigma,
                 c.quality.label(),
                 c.n_sats,
                 frame
@@ -82,11 +87,11 @@ pub fn positions_csv(sol: &FlightSolution, filter: &RowFilter) -> String {
 /// ODM uses the camera angles for radiometric calibration, so angles and accuracies are
 /// written only when the image carries DJI gimbal angles; zeros are never invented.
 /// Horizontal accuracy is the 1-sigma radial (sqrt(sE² + sN²)), vertical is 1-sigma Up.
+/// Without an uncertainty, the accuracy columns are left out and only the angles written.
 pub fn odm_geo_txt(sol: &FlightSolution, filter: &RowFilter) -> String {
     let mut s = String::from("EPSG:4326\n");
     for e in &sol.exposures {
         let Some(c) = e.camera else { continue };
-        let h_acc = (c.sigma_enu_m[0].powi(2) + c.sigma_enu_m[1].powi(2)).sqrt();
         for f in e.files.iter().filter(|f| filter.keep(&f.role)) {
             let _ = write!(
                 s,
@@ -94,7 +99,10 @@ pub fn odm_geo_txt(sol: &FlightSolution, filter: &RowFilter) -> String {
                 f.file_name, c.lon_deg, c.lat_deg, c.h_m
             );
             if let Some([y, p, r]) = f.gimbal_ypr_deg {
-                let _ = write!(s, " {y:.2} {p:.2} {r:.2} {h_acc:.4} {:.4}", c.sigma_enu_m[2]);
+                let _ = write!(s, " {y:.2} {p:.2} {r:.2}");
+                if let Some([se, sn, su]) = c.sigma_enu_m {
+                    let _ = write!(s, " {:.4} {su:.4}", (se * se + sn * sn).sqrt());
+                }
             }
             s.push('\n');
         }
@@ -102,10 +110,10 @@ pub fn odm_geo_txt(sol: &FlightSolution, filter: &RowFilter) -> String {
     s
 }
 
-/// Exposures without a camera centre.
+/// Exposures without a camera centre, or with one but no uncertainty.
 pub fn problems_csv(sol: &FlightSolution) -> String {
     let mut s = String::from("photo,files,problem\n");
-    for e in sol.exposures.iter().filter(|e| e.camera.is_none()) {
+    for e in sol.exposures.iter().filter(|e| e.problem.is_some()) {
         let files: Vec<&str> = e.files.iter().map(|f| f.file_name.as_str()).collect();
         let _ = writeln!(
             s,
@@ -132,7 +140,7 @@ mod tests {
             lat_deg: 46.35,
             lon_deg: -72.55,
             h_m: 119.82,
-            sigma_enu_m: [0.012, 0.011, 0.025],
+            sigma_enu_m: Some([0.012, 0.011, 0.025]),
             quality: SolQuality::Fixed,
             n_sats: 21,
             height_check_m: 0.0,
@@ -202,5 +210,22 @@ mod tests {
     fn problems_are_listed() {
         let p = problems_csv(&sample());
         assert!(p.contains("2,B_D.JPG,exposure outside the PPK trajectory"));
+    }
+
+    #[test]
+    fn missing_uncertainty_is_left_empty_not_zero() {
+        let mut sol = sample();
+        let e = &mut sol.exposures[0];
+        e.camera.as_mut().unwrap().sigma_enu_m = None;
+        e.problem = Some("RTKLIB covariance not positive definite; uncertainty left empty".into());
+        let csv = positions_csv(&sol, &RowFilter::All);
+        assert!(csv.lines().nth(1).unwrap().contains(",119.8200,,,,fixed,21,"));
+        let g = odm_geo_txt(&sol, &RowFilter::All);
+        assert_eq!(
+            g.lines().nth(1),
+            Some("A_D.JPG -72.5500000000 46.3500000000 119.8200 0.50 -90.00 0.00"),
+            "angles kept, accuracies left out"
+        );
+        assert!(problems_csv(&sol).contains("1,A_D.JPG A_MS_G.TIF,RTKLIB covariance not positive definite"));
     }
 }
