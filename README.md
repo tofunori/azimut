@@ -88,6 +88,30 @@ variance, seen on kinematic solutions), the uncertainty columns are left empty r
 written as 0 m, which photogrammetry software would read as a perfect position. The position
 is kept and the exposure is listed in `problems.csv`.
 
+#### Base position from CSRS-PPP
+
+Submit the base RINEX to [CSRS-PPP](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/tools-outils/ppp.php)
+(NRCan), then give its summary file instead of `--base-llh`:
+
+```sh
+./target/release/azimut process /path/to/campaign --rtklib /path/to/rtklib/bin \
+    --base /path/to/base.26o --base-ppp /path/to/12345678.sum --antex igs20.atx --out results
+```
+
+Azimut reads the position, its reference system and epoch (written into every output row),
+the 95 % uncertainties and the antenna records, and sets up the base so that RTKLIB uses the
+point CSRS-PPP estimated:
+
+| CSRS-PPP summary | The coordinates are | Azimut sets |
+|---|---|---|
+| `ANT NOT FOUND`, `ARP 0 0 0` | the antenna phase centre (no antenna type or height in the RINEX) | no antenna height, no antenna type; warns that this point is not the ground mark |
+| antenna found, `ARP 0 0 0` | the antenna reference point | antenna type, no height; requires `--antex` |
+| `ARP` offsets applied | the ground mark | type and offsets from the RINEX header, as CSRS-PPP did; requires `--antex` if the antenna was found |
+
+The RINEX given with `--base` must be the one submitted (Azimut warns when the name or the
+antenna offsets differ). `--ppp-system` picks the system when a summary holds several.
+CSRS-PPP's orthometric height is printed but outputs stay ellipsoidal.
+
 Coordinates are in the frame of the base coordinates you give. Without `--base-llh`, the
 approximate position from the base RINEX header is used: positions are then precise
 relative to each other but not in absolute terms. Heights are ellipsoidal; orthometric
@@ -116,7 +140,9 @@ of the MRK by the difference:
 ```
 
 `--from` is what the base broadcast and `--to` the corrected coordinates of the same physical
-point, both with ellipsoidal heights. `--enu E,N,U` gives the shift in metres instead. The
+point, both with ellipsoidal heights. `--to-ppp 12345678.sum` takes the corrected coordinates
+from a CSRS-PPP summary instead, and prints which point they refer to (`--from` must be that
+point). `--enu E,N,U` gives the shift in metres instead. The
 outputs are the same files as `process`. The MRK positions are already camera centres, so no
 lever arm is added. Only RTK fixed and float positions are relative to the base: single-point
 positions are not shifted and are listed in `problems.csv`. The uncertainties are the
@@ -189,9 +215,8 @@ manuals. Tested so far on synthetic data only.
    merging, gzip support.
 2. **`azimut-solve`** (this release): RTKLIB-EX `convbin` / `rnx2rtkp`, combined filter,
    ECEF solutions with full covariance, interpolation, MRK lever arm. Next: per-drone
-   profiles tested on real logs, merging logs split at 999 photos, reading CSRS-PPP results
-   (base position, antenna height and frame in one option). `shift` moves RTK flights to a
-   corrected base position (this release).
+   profiles tested on real logs, merging logs split at 999 photos. This release: CSRS-PPP
+   summaries as base position (`--base-ppp`, `--to-ppp`), and `shift` for RTK flights.
 3. **`azimut-geo`**: NAD83(CSRS) with epoch, CGVD2013, refusal of approximate
    transformations.
 4. **`azimut-export`** (this release: CSV, ODM `geo.txt`): camera angles and accuracy in

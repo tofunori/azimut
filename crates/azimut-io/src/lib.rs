@@ -11,10 +11,12 @@
 //! - [`capture`]: grouping images of one trigger (Mavic 3M: 1 JPEG + 4 bands).
 //! - [`matching`]: pairing MRK records with captures on time, never on file order.
 //! - [`scan`]: folder inventory and diagnosis before any processing.
+//! - [`csrs_ppp`]: NRCan CSRS-PPP summary files (precise base-station position).
 //!
 //! Every format rule is tied to a public source in `SOURCES.md` at the repository root.
 
 pub mod capture;
+pub mod csrs_ppp;
 pub mod error;
 pub mod headers;
 pub mod matching;
