@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 
 use azimut_export::{odm_geo_txt, positions_csv, problems_csv, RowFilter};
+use azimut_io::csrs_ppp::{self, PppPoint, PppSummary};
 use azimut_io::matching::DEFAULT_TOLERANCE_S;
 use azimut_io::rinex::is_nav_name;
 use azimut_io::scan::AuxKind;
@@ -61,6 +62,17 @@ enum Command {
         /// IGS base antenna type with radome (needs --antex to have an effect).
         #[arg(long)]
         antenna_type: Option<String>,
+        /// CSRS-PPP summary (.sum) of the base RINEX: base position, antenna handling and
+        /// frame are taken from it. The RINEX given with --base must be the one submitted.
+        #[arg(
+            long,
+            value_name = "FILE.sum",
+            conflicts_with_all = ["base_llh", "antenna_height", "antenna_type"]
+        )]
+        base_ppp: Option<PathBuf>,
+        /// Reference system to take from the CSRS-PPP summary when it holds several.
+        #[arg(long, value_name = "SYSTEM", requires = "base_ppp")]
+        ppp_system: Option<String>,
         /// ANTEX file with antenna phase-centre models (e.g. igs20.atx).
         #[arg(long)]
         antex: Option<PathBuf>,
@@ -87,16 +99,29 @@ enum Command {
     /// e.g. after a PPP solution of the RTK base, and write them for every flight. Images are
     /// not modified.
     #[command(group(ArgGroup::new("shift").required(true).args(["from", "enu"])))]
+    #[command(group(ArgGroup::new("target").args(["to", "to_ppp"])))]
     Shift {
         /// Folder holding the flights: an SD card copy, a mission folder or a whole campaign.
         dir: PathBuf,
         /// Base coordinates the aircraft used, as the RTK base broadcast them:
         /// latitude,longitude,ellipsoidal height (degrees, m).
-        #[arg(long, value_name = "LAT,LON,H", requires = "to", allow_hyphen_values = true)]
+        #[arg(
+            long,
+            value_name = "LAT,LON,H",
+            requires = "target",
+            allow_hyphen_values = true
+        )]
         from: Option<String>,
-        /// Correct coordinates of the same physical point (e.g. from CSRS-PPP), same format.
+        /// Correct coordinates of the same physical point, same format.
         #[arg(long, value_name = "LAT,LON,H", requires = "from", allow_hyphen_values = true)]
         to: Option<String>,
+        /// CSRS-PPP summary (.sum) of the base, instead of --to. --from must then be the point
+        /// it refers to (printed at the start).
+        #[arg(long, value_name = "FILE.sum", requires = "from")]
+        to_ppp: Option<PathBuf>,
+        /// Reference system to take from the CSRS-PPP summary when it holds several.
+        #[arg(long, value_name = "SYSTEM", requires = "to_ppp")]
+        ppp_system: Option<String>,
         /// Shift as East,North,Up in metres, instead of --from and --to.
         #[arg(long, value_name = "E,N,U", allow_hyphen_values = true)]
         enu: Option<String>,
@@ -173,6 +198,8 @@ fn main() -> Result<()> {
             frame,
             antenna_height,
             antenna_type,
+            base_ppp,
+            ppp_system,
             antex,
             rtklib,
             no_beidou,
@@ -193,27 +220,54 @@ fn main() -> Result<()> {
             print_report(&report);
             let rtk = Rtklib::locate(rtklib.as_deref())?;
 
-            let position = match &base_llh {
-                Some(t) => {
-                    let [lat_deg, lon_deg, h_ell_m] = triplet(t, "--base-llh", "LAT,LON,H")?;
-                    BasePosition::Llh {
-                        lat_deg,
-                        lon_deg,
-                        h_ell_m,
+            let ppp = match &base_ppp {
+                Some(path) => Some(read_ppp(path)?),
+                None => None,
+            };
+            let base_setup = match &ppp {
+                Some(sum) => {
+                    let (mut setup, point) = BaseSetup::from_ppp(sum, ppp_system.as_deref(), antex.is_some())
+                        .map_err(anyhow::Error::msg)
+                        .with_context(|| format!("--base-ppp {}", base_ppp.as_ref().unwrap().display()))?;
+                    print_ppp(sum, ppp_system.as_deref(), &point)?;
+                    if let Some(f) = frame {
+                        setup.frame = f;
+                    }
+                    setup
+                }
+                None => {
+                    let position = match &base_llh {
+                        Some(t) => {
+                            let [lat_deg, lon_deg, h_ell_m] = triplet(t, "--base-llh", "LAT,LON,H")?;
+                            BasePosition::Llh {
+                                lat_deg,
+                                lon_deg,
+                                h_ell_m,
+                            }
+                        }
+                        None => BasePosition::RinexHeader,
+                    };
+                    let frame = frame.unwrap_or_else(|| match position {
+                        BasePosition::RinexHeader => "approximate (base RINEX header position)".into(),
+                        _ => "as given with --base-llh (frame not stated)".into(),
+                    });
+                    if position == BasePosition::RinexHeader {
+                        println!(
+                            "\nNote: no --base-llh or --base-ppp given. The base RINEX header position is \
+                             often only metre-level:"
+                        );
+                        println!(
+                            "      positions are precise relative to each other, not in absolute terms."
+                        );
+                    }
+                    BaseSetup {
+                        position,
+                        antenna_height_m: antenna_height,
+                        antenna_type,
+                        frame,
                     }
                 }
-                None => BasePosition::RinexHeader,
             };
-            let frame = frame.unwrap_or_else(|| match position {
-                BasePosition::RinexHeader => "approximate (base RINEX header position)".into(),
-                _ => "as given with --base-llh (frame not stated)".into(),
-            });
-            if position == BasePosition::RinexHeader {
-                println!(
-                    "\nNote: no --base-llh given. The base RINEX header position is often only metre-level:"
-                );
-                println!("      positions are precise relative to each other, not in absolute terms.");
-            }
             let mut ppk = if no_beidou {
                 PpkConfig::dji_without_beidou()
             } else {
@@ -222,12 +276,7 @@ fn main() -> Result<()> {
             ppk.antex = antex;
             let opts = ProcessOptions {
                 ppk,
-                base: BaseSetup {
-                    position,
-                    antenna_height_m: antenna_height,
-                    antenna_type,
-                    frame,
-                },
+                base: base_setup,
                 max_gap_s: max_gap,
                 work_dir: out.join("work"),
             };
@@ -249,6 +298,9 @@ fn main() -> Result<()> {
                     continue;
                 };
                 let base_obs = &report.rinex[b.rinex].path;
+                if let Some(sum) = &ppp {
+                    check_ppp_rinex(sum, &report.rinex[b.rinex]);
+                }
                 let base_navs = sibling_navs(base_obs);
                 match process_flight(f, base_obs, &base_navs, &rtk, &opts) {
                     Ok(sol) => {
@@ -268,6 +320,8 @@ fn main() -> Result<()> {
             dir,
             from,
             to,
+            to_ppp,
+            ppp_system,
             enu,
             frame,
             out,
@@ -275,15 +329,31 @@ fn main() -> Result<()> {
             tolerance,
         } => {
             anyhow::ensure!(dir.is_dir(), "{} is not a folder", dir.display());
-            let spec = match (&from, &to, &enu) {
-                (Some(f), Some(t), None) => ShiftSpec::Points {
+            let mut ppp_frame = None;
+            let spec = match (&from, &to, &to_ppp, &enu) {
+                (Some(f), Some(t), None, None) => ShiftSpec::Points {
                     from_llh: triplet(f, "--from", "LAT,LON,H")?,
                     to_llh: triplet(t, "--to", "LAT,LON,H")?,
                 },
-                (None, None, Some(e)) => ShiftSpec::Enu {
+                (Some(f), None, Some(path), None) => {
+                    let sum = read_ppp(path)?;
+                    // Antenna checks only matter for PPK; here the point itself is what counts.
+                    let (setup, point) = BaseSetup::from_ppp(&sum, ppp_system.as_deref(), true)
+                        .map_err(anyhow::Error::msg)
+                        .with_context(|| format!("--to-ppp {}", path.display()))?;
+                    print_ppp(&sum, ppp_system.as_deref(), &point)?;
+                    println!("--from must be the base coordinates of this same point.");
+                    ppp_frame = Some(setup.frame);
+                    let p = sum.position(ppp_system.as_deref()).map_err(anyhow::Error::msg)?;
+                    ShiftSpec::Points {
+                        from_llh: triplet(f, "--from", "LAT,LON,H")?,
+                        to_llh: [p.lat_deg, p.lon_deg, p.h_ell_m],
+                    }
+                }
+                (None, None, None, Some(e)) => ShiftSpec::Enu {
                     enu_m: triplet(e, "--enu", "E,N,U")?,
                 },
-                _ => anyhow::bail!("give either --from and --to, or --enu"),
+                _ => anyhow::bail!("give --from with --to or --to-ppp, or --enu"),
             };
             let [e, n, u] = spec.enu_m();
             let horizontal = e.hypot(n);
@@ -292,7 +362,7 @@ fn main() -> Result<()> {
                 "a shift of {:.0} m is not a base correction; check the coordinates",
                 horizontal.hypot(u)
             );
-            let frame = frame.unwrap_or_else(|| match spec {
+            let frame = frame.or(ppp_frame).unwrap_or_else(|| match spec {
                 ShiftSpec::Points { .. } => "as given with --to (frame not stated)".into(),
                 ShiftSpec::Enu { .. } => "shifted RTK positions (frame not stated)".into(),
             });
@@ -393,6 +463,70 @@ fn sibling_navs(obs: &Path) -> Vec<PathBuf> {
         .unwrap_or_default();
     v.sort();
     v
+}
+
+fn read_ppp(path: &Path) -> Result<PppSummary> {
+    csrs_ppp::read(path).with_context(|| format!("reading CSRS-PPP summary {}", path.display()))
+}
+
+/// Print what a CSRS-PPP summary gives, and what its coordinates refer to.
+fn print_ppp(sum: &PppSummary, system: Option<&str>, point: &str) -> Result<()> {
+    let p = sum.position(system).map_err(anyhow::Error::msg)?;
+    println!(
+        "\nBase from CSRS-PPP {} ({}, RINEX {}):",
+        sum.version.as_deref().unwrap_or("?"),
+        sum.mode.as_deref().unwrap_or("?"),
+        sum.rinex.as_deref().unwrap_or("?")
+    );
+    println!(
+        "   {:.9}, {:.9}, h {:.4} m ellipsoidal  [{} epoch {}]",
+        p.lat_deg, p.lon_deg, p.h_ell_m, p.system, p.epoch
+    );
+    println!(
+        "   95 % uncertainty: lat {:.4} m, lon {:.4} m, h {:.4} m; ambiguities fixed: {}",
+        p.sigma95_m[0],
+        p.sigma95_m[1],
+        p.sigma95_m[2],
+        sum.fixed_ambiguities_pct
+            .map(|v| format!("{v:.1} %"))
+            .unwrap_or_else(|| "not reported".into())
+    );
+    if let Some((sys, model, h)) = &sum.orthometric {
+        println!("   orthometric {sys} ({model}): {h:.4} m (outputs stay ellipsoidal)");
+    }
+    println!("   These coordinates are {point}.");
+    if sum.point() == PppPoint::PhaseCentre {
+        println!(
+            "   WARNING: the base RINEX had no antenna type or height. Photos are positioned \
+             correctly, but this base point is not the mark on the ground: add the antenna type and \
+             height to the RINEX header before submitting to CSRS-PPP to tie the survey to the mark."
+        );
+    }
+    Ok(())
+}
+
+/// Warn when the base RINEX used for a flight is not the one CSRS-PPP processed.
+fn check_ppp_rinex(sum: &PppSummary, base: &azimut_io::rinex::RinexSummary) {
+    let name = base
+        .path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if let Some(r) = &sum.rinex {
+        if !r.eq_ignore_ascii_case(&name) {
+            println!(
+                "   WARNING: base RINEX is {name}, CSRS-PPP processed {r}. Antenna height and type \
+                 must be the same in both."
+            );
+        }
+    }
+    if sum.point() == PppPoint::Mark {
+        if let (Some(arp), Some(hen)) = (sum.arp_m, base.antenna_delta_hen_m) {
+            if (0..3).any(|k| (arp[k] - hen[k]).abs() > 0.0005) {
+                println!("   WARNING: antenna offsets differ: RINEX header {hen:?} m, CSRS-PPP {arp:?} m.");
+            }
+        }
+    }
 }
 
 /// Parse `A,B,C` into three numbers.

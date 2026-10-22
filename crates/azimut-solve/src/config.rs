@@ -7,6 +7,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use azimut_io::csrs_ppp::{PppPoint, PppSummary};
+
 /// Where the base antenna is.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
@@ -46,6 +48,85 @@ impl Default for BaseSetup {
             antenna_type: None,
             frame: "unspecified (frame of the base coordinates)".into(),
         }
+    }
+}
+
+impl BaseSetup {
+    /// Base setup from a CSRS-PPP summary, chosen so that RTKLIB uses the point CSRS-PPP
+    /// estimated (see SOURCES.md, CSRS-PPP). Returns the setup and a description of that
+    /// point. `system` picks the reference system when the summary holds several.
+    ///
+    /// - Antenna not found, no offsets: the coordinates are the uncalibrated antenna phase
+    ///   centre, so the base gets no antenna height and no antenna type.
+    /// - Antenna found, no offsets: the antenna reference point; the antenna type is passed
+    ///   on and an ANTEX file is required so RTKLIB applies the same phase-centre offsets.
+    /// - Offsets applied: the mark; type and offsets are read from the same RINEX header
+    ///   CSRS-PPP used (`ant2-anttype=*`), with the same ANTEX requirement if the antenna
+    ///   was found.
+    pub fn from_ppp(
+        sum: &PppSummary,
+        system: Option<&str>,
+        antex_given: bool,
+    ) -> Result<(BaseSetup, String), String> {
+        let p = sum.position(system)?;
+        let epoch = p
+            .epoch_year
+            .map(|y| format!("{y:.3}"))
+            .unwrap_or_else(|| p.epoch.clone());
+        let frame = format!("{}, epoch {epoch} (CSRS-PPP)", p.system);
+        let position = BasePosition::Llh {
+            lat_deg: p.lat_deg,
+            lon_deg: p.lon_deg,
+            h_ell_m: p.h_ell_m,
+        };
+        let need_antex = |ant: &str| {
+            if antex_given {
+                Ok(())
+            } else {
+                Err(format!(
+                    "CSRS-PPP applied the phase-centre model of {ant}; give the same model with \
+                     --antex (e.g. igs20.atx) so RTKLIB uses the same point, or heights will be \
+                     off by the phase-centre offset"
+                ))
+            }
+        };
+        let (antenna_height_m, antenna_type, point) = match sum.point() {
+            PppPoint::PhaseCentre => (
+                Some(0.0),
+                None,
+                "the antenna phase centre (CSRS-PPP found no antenna type and no antenna \
+                 height in the RINEX header), not the ground mark"
+                    .to_string(),
+            ),
+            PppPoint::ReferencePoint => {
+                let ant = sum.antenna.clone().unwrap_or_default();
+                need_antex(&ant)?;
+                (
+                    Some(0.0),
+                    Some(ant.clone()),
+                    format!("the antenna reference point of {ant} (no antenna height in the RINEX header)"),
+                )
+            }
+            PppPoint::Mark => {
+                if let Some(ant) = &sum.antenna {
+                    need_antex(ant)?;
+                }
+                (
+                    None,
+                    None,
+                    "the ground mark (antenna offsets from the RINEX header applied)".to_string(),
+                )
+            }
+        };
+        Ok((
+            BaseSetup {
+                position,
+                antenna_height_m,
+                antenna_type,
+                frame,
+            },
+            point,
+        ))
     }
 }
 
@@ -207,6 +288,51 @@ impl PpkConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ppp(ant: &str, arp: &str) -> PppSummary {
+        let text = format!(
+            "VER 4.14.11\nANT {ant}\nARP {arp}\n\
+             POS LAT IGS20 24:153:64110 46 20 56.9 46 20 56.84444 0 0.0052 1\n\
+             POS LON IGS20 24:153:64110 -72 33 4.4 -72 33 4.44444 0 0.0043 0 1\n\
+             POS HGT IGS20 24:153:64110 33.7 31.204 0 0.0195 0 0 1\n"
+        );
+        azimut_io::csrs_ppp::parse_str(&text).unwrap()
+    }
+
+    #[test]
+    fn ppp_phase_centre_gets_no_antenna() {
+        let (b, point) = BaseSetup::from_ppp(&ppp("NOT FOUND", "0 0 0"), None, false).unwrap();
+        assert_eq!(b.antenna_height_m, Some(0.0));
+        assert_eq!(b.antenna_type, None);
+        assert!(point.contains("phase centre"));
+        assert_eq!(b.frame, "IGS20, epoch 2024.417 (CSRS-PPP)");
+        let BasePosition::Llh { h_ell_m, .. } = b.position else {
+            panic!("llh expected");
+        };
+        assert_eq!(h_ell_m, 31.204);
+        let conf = PpkConfig::dji().to_conf(&b);
+        assert!(conf.contains("ant2-antdelu      =0.0000"));
+        assert!(conf.contains("ant2-anttype      =\n"));
+    }
+
+    #[test]
+    fn ppp_with_antenna_needs_antex() {
+        let s = ppp("TRM59800.00     NONE", "0 0 0");
+        assert!(BaseSetup::from_ppp(&s, None, false)
+            .unwrap_err()
+            .contains("--antex"));
+        let (b, _) = BaseSetup::from_ppp(&s, None, true).unwrap();
+        assert_eq!(b.antenna_type.as_deref(), Some("TRM59800.00     NONE"));
+        assert_eq!(b.antenna_height_m, Some(0.0));
+    }
+
+    #[test]
+    fn ppp_mark_reads_offsets_from_rinex_header() {
+        let (b, point) = BaseSetup::from_ppp(&ppp("NOT FOUND", "1.8 0 0"), None, false).unwrap();
+        assert_eq!(b.antenna_height_m, None);
+        assert!(point.contains("ground mark"));
+        assert!(PpkConfig::dji().to_conf(&b).contains("ant2-anttype      =*"));
+    }
 
     #[test]
     fn navsys_mask() {

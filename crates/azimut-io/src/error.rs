@@ -11,6 +11,8 @@ pub enum Error {
     },
     #[error("{path}: not a {expected} file")]
     Format { path: PathBuf, expected: &'static str },
+    #[error("{path}: {reason}")]
+    Parse { path: PathBuf, reason: String },
 }
 
 impl Error {
