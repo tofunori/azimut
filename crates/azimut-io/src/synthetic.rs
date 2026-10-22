@@ -43,6 +43,8 @@ pub struct SyntheticFlight {
     pub band_size: (u32, u32),
     /// Write `CaptureUUID` in the XMP.
     pub with_uuid: bool,
+    /// Band exposure time minus JPEG exposure time, seconds (about 0.026 on a real Mavic 3M).
+    pub band_delay_s: f64,
 }
 
 impl Default for SyntheticFlight {
@@ -63,6 +65,7 @@ impl Default for SyntheticFlight {
             float_at: vec![],
             band_size: (1, 1),
             with_uuid: true,
+            band_delay_s: 0.0,
         }
     }
 }
@@ -223,6 +226,7 @@ pub fn write_flight(dir: &Path, spec: &SyntheticFlight) -> io::Result<Vec<PathBu
                     _ => "NIR",
                 };
                 let mut attrs = base.clone();
+                attrs[0].1 = format_dji_clock(clock + spec.band_delay_s);
                 attrs.push(("BandName", band.label().to_string()));
                 attrs.push(("SensorIndex", (k + 1).to_string()));
                 let tif = dir.join(format!("DJI_{stamp}_{index:04}_MS_{token}.TIF"));

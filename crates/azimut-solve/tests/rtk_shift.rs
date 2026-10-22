@@ -59,3 +59,39 @@ fn shifts_every_paired_exposure_and_keeps_status() {
     let orphan = sol.exposures.iter().find(|e| e.camera.is_none()).unwrap();
     assert_eq!(orphan.problem.as_deref(), Some("no MRK record for this capture"));
 }
+
+#[test]
+fn bands_are_interpolated_between_mrk_records() {
+    let tmp = tempfile::tempdir().unwrap();
+    let spec = SyntheticFlight {
+        captures: 6,
+        band_delay_s: 0.0264,
+        ..Default::default()
+    };
+    write_flight(tmp.path(), &spec).unwrap();
+    let report = scan(tmp.path(), &ScanOptions::default());
+    let sol = shift_flight(&report.flights[0], &ShiftSpec::Enu { enu_m: [0.0; 3] }, "x");
+
+    // Synthetic MRK positions move 1e-4 degree north per 2 s interval.
+    let north_deg = 1.0e-4 / spec.interval_s * 0.0264;
+    for e in &sol.exposures[..5] {
+        let jpeg = e.files.iter().find(|f| f.role == "jpeg").unwrap().camera.unwrap();
+        for band in e.files.iter().filter(|f| f.role != "jpeg") {
+            let b = band.camera.expect("interpolated band position");
+            assert!(((b.lat_deg - jpeg.lat_deg) - north_deg).abs() < 1e-9);
+        }
+    }
+    // The last exposure has no later record to interpolate towards.
+    let last = sol.exposures.last().unwrap();
+    assert!(last
+        .files
+        .iter()
+        .filter(|f| f.role != "jpeg")
+        .all(|f| f.camera.is_none()));
+    assert!(last
+        .problem
+        .as_deref()
+        .unwrap()
+        .contains("no neighbouring MRK record"));
+    assert_eq!(sol.stats.files_without_position, 4);
+}

@@ -89,8 +89,11 @@ struct Setup {
 }
 
 fn setup() -> Setup {
+    setup_with(SyntheticFlight::default())
+}
+
+fn setup_with(flight: SyntheticFlight) -> Setup {
     let tmp = tempfile::tempdir().unwrap();
-    let flight = SyntheticFlight::default();
     write_flight(&tmp.path().join("data/DJI_001"), &flight).unwrap();
     let base = tmp.path().join("data/base/BASE_MO.rnx");
     std::fs::create_dir_all(base.parent().unwrap()).unwrap();
@@ -164,6 +167,38 @@ fn camera_centres_follow_the_trajectory_and_lever_arm() {
     );
     assert_eq!(sol.exposures[3].camera.unwrap().quality, SolQuality::Float);
     assert_eq!(sol.stats.exposures_float, 1);
+}
+
+#[test]
+fn bands_are_placed_at_their_own_exposure_time() {
+    // Measured on a real Mavic 3M: bands are exposed about 26 ms after the RGB JPEG.
+    let s = setup_with(SyntheticFlight {
+        band_delay_s: 0.0264,
+        ..Default::default()
+    });
+    let pos = s.bin.join("prepared.pos");
+    write_pos(&pos, &s.flight, None);
+    let rtk = fake_rtklib(&s.bin, &pos, false);
+    let sol = process_flight(&s.report.flights[0], &s.base, &[], &rtk, &options(&s.work)).unwrap();
+    assert_eq!(sol.stats.files_without_position, 0);
+
+    // The antenna moves 1e-4 degree north per 2 s interval.
+    let north_deg = 1.0e-4 / s.flight.interval_s * 0.0264;
+    for e in &sol.exposures {
+        let jpeg = e.files.iter().find(|f| f.role == "jpeg").unwrap();
+        assert_eq!(jpeg.time_offset_s, Some(0.0));
+        assert_eq!(jpeg.camera, e.camera, "the MRK times the JPEG");
+        for band in e.files.iter().filter(|f| f.role != "jpeg") {
+            assert!((band.time_offset_s.unwrap() - 0.0264).abs() < 2e-6);
+            let (b, j) = (band.camera.unwrap(), jpeg.camera.unwrap());
+            assert!(
+                ((b.lat_deg - j.lat_deg) - north_deg).abs() < 1e-9,
+                "{}: band {} deg north of the JPEG",
+                band.file_name,
+                b.lat_deg - j.lat_deg
+            );
+        }
+    }
 }
 
 #[test]

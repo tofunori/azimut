@@ -7,6 +7,10 @@
 //! broadcast one removes that offset. The MRK positions are already camera (CMOS) centres,
 //! so no lever arm is added. Only fixed and float positions are relative to the base:
 //! single-point positions are left without a position. Images are never modified.
+//!
+//! The MRK times the RGB JPEG. A file exposed at another time (Mavic 3M bands, about 26 ms
+//! later) is placed by linear interpolation between this record and the next one (or the
+//! previous one), both shifted; records more than [`MAX_SPAN_S`] apart are not interpolated.
 //! See SOURCES.md (RTK shift).
 
 use serde::{Deserialize, Serialize};
@@ -16,8 +20,13 @@ use azimut_io::scan::Flight;
 
 use crate::camera::CameraCentre;
 use crate::geodesy::{ecef_to_geodetic, enu_basis, geodetic_to_ecef};
-use crate::pipeline::{exposure_files, finish, ExposureSolution, FlightSolution, Method, SolutionStats};
+use crate::pipeline::{
+    exposure_files, finish, place_files, ExposureSolution, FlightSolution, Method, SolutionStats,
+};
 use crate::pos::SolQuality;
+
+/// Largest time between two MRK records that a file's position is interpolated across, seconds.
+pub const MAX_SPAN_S: f64 = 10.0;
 
 /// The shift to apply.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -101,6 +110,51 @@ pub fn shifted_camera(rec: &MrkRecord, spec: &ShiftSpec) -> Result<CameraCentre,
     })
 }
 
+/// Camera centre `dt` seconds after record `i`, interpolated between shifted records.
+fn interpolated(flight: &Flight, i: usize, dt: f64, spec: &ShiftSpec) -> Result<CameraCentre, String> {
+    let j = if dt > 0.0 {
+        i.checked_add(1)
+    } else {
+        i.checked_sub(1)
+    };
+    let Some(other) = j.and_then(|j| flight.mrk.get(j)) else {
+        return Err("no neighbouring MRK record to interpolate its own exposure time".into());
+    };
+    let (a, b) = if dt > 0.0 {
+        (&flight.mrk[i].record, &other.record)
+    } else {
+        (&other.record, &flight.mrk[i].record)
+    };
+    let (ta, tb) = (a.gps_seconds(), b.gps_seconds());
+    let t = flight.mrk[i].record.gps_seconds() + dt;
+    if !(tb > ta && tb - ta <= MAX_SPAN_S && (ta..=tb).contains(&t)) {
+        return Err(format!(
+            "neighbouring MRK record more than {MAX_SPAN_S:.0} s away or out of order"
+        ));
+    }
+    let (ca, cb) = (shifted_camera(a, spec)?, shifted_camera(b, spec)?);
+    let w = (t - ta) / (tb - ta);
+    let xyz = [0, 1, 2].map(|k| ca.xyz[k] + w * (cb.xyz[k] - ca.xyz[k]));
+    let (lat, lon, h) = ecef_to_geodetic(xyz);
+    Ok(CameraCentre {
+        xyz,
+        lat_deg: lat,
+        lon_deg: lon,
+        h_m: h,
+        sigma_enu_m: ca
+            .sigma_enu_m
+            .zip(cb.sigma_enu_m)
+            .map(|(p, q)| [0, 1, 2].map(|k| p[k].max(q[k]))),
+        quality: if ca.quality.rank() >= cb.quality.rank() {
+            ca.quality
+        } else {
+            cb.quality
+        },
+        n_sats: None,
+        height_check_m: 0.0,
+    })
+}
+
 /// Shift every paired exposure of a scanned flight.
 pub fn shift_flight(flight: &Flight, spec: &ShiftSpec, frame: &str) -> FlightSolution {
     let mut exposures = Vec::new();
@@ -116,13 +170,15 @@ pub fn shift_flight(flight: &Flight, spec: &ShiftSpec, frame: &str) -> FlightSol
             }
             Err(e) => (None, Some(e)),
         };
-        exposures.push(ExposureSolution {
+        let mut e = ExposureSolution {
             index: Some(rec.index),
             gps_s: Some(rec.gps_seconds()),
             files: exposure_files(flight, pair.capture),
             camera,
             problem,
-        });
+        };
+        place_files(&mut e, |dt| interpolated(flight, pair.mrk, dt, spec));
+        exposures.push(e);
     }
     let (exposures, stats) = finish(flight, exposures, SolutionStats::default());
     FlightSolution {

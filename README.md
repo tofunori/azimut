@@ -72,9 +72,9 @@ does not need without LAPACK: if it is not installed, build with `make LDLIBS=-l
 
 For each flight folder, `process` converts the aircraft's raw RTCM 3 log to RINEX 3.04
 (`convbin`), runs a kinematic, forward/backward-combined PPK against the base
-(`rnx2rtkp`, options file kept in `results/work/`), interpolates the antenna to each MRK
-exposure (never extrapolating, and refusing gaps over 1 s), adds the MRK lever arm, and
-writes:
+(`rnx2rtkp`, options file kept in `results/work/`), interpolates the antenna to each image's
+own exposure time (never extrapolating, and refusing gaps over 1 s), adds the MRK lever arm,
+and writes:
 
 | File | Content |
 |---|---|
@@ -149,6 +149,10 @@ positions are not shifted and are listed in `problems.csv`. The uncertainties ar
 aircraft's own, relative to the base; the uncertainty of the corrected base position is not
 added. A vertical shift over 5 m is flagged (an orthometric height given by mistake differs
 by the geoid height, about -30 m in Quebec) and a shift over 500 m is refused.
+
+Files exposed at another time than the RGB JPEG (Mavic 3M bands) are placed by linear
+interpolation between this MRK record and the next one, if both are RTK and less than 10 s
+apart; otherwise they get no position and are listed in `problems.csv`.
 
 Images are not modified: the positions go to the CSV and `geo.txt` files that Metashape,
 Pix4D and ODM import. Writing them into the images will come with the ExifTool option, which
@@ -225,12 +229,27 @@ manuals. Tested so far on synthetic data only.
 6. **App**: native desktop interface (GPUI).
 7. **Validation**: checkpoints (ASPRS Ed. 2), comparison with other tools, open test dataset.
 
+## Checked on real data
+
+On one Mavic 3M flight (firmware 11.08.01.41, August 2024, 13 captures and the full MRK):
+
+- `UTCAtExposure` holds GPS time: it matches the MRK GPS time within 1 µs. The camera
+  clock (file names, `ModifyDate`) is therefore 18 s ahead of UTC.
+- The MRK times the RGB JPEG. **The four band TIFFs are exposed 26.3 ± 0.3 ms later**, all
+  at the same time. At 3.6 m/s that is 9.5 cm, at 10 m/s 26 cm, so Azimut positions every
+  file at its own exposure time. The offset between the RGB lens and the band lenses is not
+  documented and not applied.
+- One XMP packet per JPEG and per TIFF; `CaptureUUID` shared by the five files, `BandName`
+  `Green`, `Red`, `RedEdge`, `NIR`; MRK record number equals the file number.
+- The MRK can hold more records than images (here 454 for 450 captures, the last capture
+  with only JPEG and Green): unpaired records and incomplete captures are reported.
+
 ## To confirm on real data
 
-- Whether `UTCAtExposure` holds GPS time or UTC on each model (handled either way).
-- Whether the JPEG and TIFF of one Mavic 3M capture carry the same exposure time.
-- Exact MRK layout of the Matrice 4 and Matrice 400 (`*_D.MRK` naming).
-- Number of XMP packets in Mavic 3M TIFFs (all are read).
+- The same measurements on other firmware versions and on the Mavic 3E, Matrice 4 and
+  Matrice 400 (`*_D.MRK` naming).
+- The meaning of the `*_F.JPG` file found once in a Mavic 3M flight (2592 × 1944, no exposure
+  time, same `CaptureUUID` as the first capture).
 
 ## Contributing
 
