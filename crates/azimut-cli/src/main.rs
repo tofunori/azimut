@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand};
 
 use azimut_export::{odm_geo_txt, positions_csv, problems_csv, RowFilter};
 use azimut_io::matching::DEFAULT_TOLERANCE_S;
@@ -11,7 +11,10 @@ use azimut_io::rinex::is_nav_name;
 use azimut_io::scan::AuxKind;
 use azimut_io::synthetic::{write_flight, write_rinex, SyntheticFlight, SyntheticRinex, M3M_BAND_SIZE};
 use azimut_io::{scan, ScanOptions, ScanReport, Severity};
-use azimut_solve::{process_flight, BasePosition, BaseSetup, PpkConfig, ProcessOptions, Rtklib};
+use azimut_solve::{
+    process_flight, shift_flight, BasePosition, BaseSetup, FlightSolution, Method, PpkConfig, ProcessOptions,
+    Rtklib, ShiftSpec,
+};
 
 #[derive(Parser)]
 #[command(name = "azimut", version, about = "Open-source PPK geotagging for DJI drones")]
@@ -76,6 +79,37 @@ enum Command {
         /// Largest trajectory gap around an exposure, seconds.
         #[arg(long, default_value_t = 1.0)]
         max_gap: f64,
+        /// Pairing tolerance between MRK and image times, seconds.
+        #[arg(long, default_value_t = DEFAULT_TOLERANCE_S)]
+        tolerance: f64,
+    },
+    /// Move the real-time (RTK) camera positions of the MRK by a constant base correction,
+    /// e.g. after a PPP solution of the RTK base, and write them for every flight. Images are
+    /// not modified.
+    #[command(group(ArgGroup::new("shift").required(true).args(["from", "enu"])))]
+    Shift {
+        /// Folder holding the flights: an SD card copy, a mission folder or a whole campaign.
+        dir: PathBuf,
+        /// Base coordinates the aircraft used, as the RTK base broadcast them:
+        /// latitude,longitude,ellipsoidal height (degrees, m).
+        #[arg(long, value_name = "LAT,LON,H", requires = "to", allow_hyphen_values = true)]
+        from: Option<String>,
+        /// Correct coordinates of the same physical point (e.g. from CSRS-PPP), same format.
+        #[arg(long, value_name = "LAT,LON,H", requires = "from", allow_hyphen_values = true)]
+        to: Option<String>,
+        /// Shift as East,North,Up in metres, instead of --from and --to.
+        #[arg(long, value_name = "E,N,U", allow_hyphen_values = true)]
+        enu: Option<String>,
+        /// Reference frame and epoch of the corrected positions (those of --to), written
+        /// into every output row, e.g. "NAD83(CSRS) v8, epoch 2010.0".
+        #[arg(long)]
+        frame: Option<String>,
+        /// Output folder.
+        #[arg(long, default_value = "azimut_out")]
+        out: PathBuf,
+        /// Only write rows for these file roles: jpeg, Green, Red, RedEdge, NIR, tiff.
+        #[arg(long, value_delimiter = ',')]
+        roles: Vec<String>,
         /// Pairing tolerance between MRK and image times, seconds.
         #[arg(long, default_value_t = DEFAULT_TOLERANCE_S)]
         tolerance: f64,
@@ -161,16 +195,11 @@ fn main() -> Result<()> {
 
             let position = match &base_llh {
                 Some(t) => {
-                    let v: Vec<f64> = t
-                        .split(',')
-                        .map(|x| x.trim().parse::<f64>())
-                        .collect::<Result<_, _>>()
-                        .context("--base-llh expects LAT,LON,H")?;
-                    anyhow::ensure!(v.len() == 3, "--base-llh expects LAT,LON,H");
+                    let [lat_deg, lon_deg, h_ell_m] = triplet(t, "--base-llh", "LAT,LON,H")?;
                     BasePosition::Llh {
-                        lat_deg: v[0],
-                        lon_deg: v[1],
-                        h_ell_m: v[2],
+                        lat_deg,
+                        lon_deg,
+                        h_ell_m,
                     }
                 }
                 None => BasePosition::RinexHeader,
@@ -202,20 +231,12 @@ fn main() -> Result<()> {
                 max_gap_s: max_gap,
                 work_dir: out.join("work"),
             };
-            let filter = if roles.is_empty() {
-                RowFilter::All
-            } else {
-                RowFilter::Roles(roles)
-            };
+            let filter = row_filter(roles);
             std::fs::create_dir_all(&out).with_context(|| format!("creating {}", out.display()))?;
 
             let mut failures = 0;
             for f in &report.flights {
-                let name = f
-                    .dir
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "flight".into());
+                let name = flight_name(&f.dir);
                 println!("\n== Processing {name}");
                 if f.matching.pairs.is_empty() {
                     println!("   skipped: no exposure paired with the MRK");
@@ -231,55 +252,8 @@ fn main() -> Result<()> {
                 let base_navs = sibling_navs(base_obs);
                 match process_flight(f, base_obs, &base_navs, &rtk, &opts) {
                     Ok(sol) => {
-                        let csv = out.join(format!("{name}_positions.csv"));
-                        std::fs::write(&csv, positions_csv(&sol, &filter))?;
-                        std::fs::write(out.join(format!("{name}_geo.txt")), odm_geo_txt(&sol, &filter))?;
-                        std::fs::write(
-                            out.join(format!("{name}_solution.json")),
-                            serde_json::to_string_pretty(&sol)?,
-                        )?;
-                        let st = &sol.stats;
-                        if st.exposures_missing + st.exposures_without_sigma > 0 {
-                            std::fs::write(out.join(format!("{name}_problems.csv")), problems_csv(&sol))?;
-                        }
-                        let med = |k: usize| {
-                            median(
-                                sol.exposures
-                                    .iter()
-                                    .filter_map(|e| e.camera.and_then(|c| c.sigma_enu_m).map(|s| s[k])),
-                            )
-                        };
-                        println!(
-                            "   {} exposures: {} fixed, {} float, {} other, {} without position",
-                            st.exposures,
-                            st.exposures_fixed,
-                            st.exposures_float,
-                            st.exposures_other,
-                            st.exposures_missing
-                        );
-                        let sigmas = if st.exposures_without_sigma < st.exposures - st.exposures_missing {
-                            format!("{:.3} / {:.3} / {:.3} m", med(0), med(1), med(2))
-                        } else {
-                            "none".into()
-                        };
-                        println!(
-                            "   trajectory: {} epochs, {:.1} % fixed; median sigma E/N/U: {sigmas}",
-                            st.epochs,
-                            100.0 * st.epochs_fixed as f64 / st.epochs.max(1) as f64,
-                        );
-                        if st.exposures_without_sigma > 0 {
-                            println!(
-                                "   WARNING: {} exposure(s) without uncertainty: RTKLIB covariance not \
-                                 positive definite (sigma left empty, see problems.csv)",
-                                st.exposures_without_sigma
-                            );
-                        }
-                        if st.max_height_check_m > 0.001 {
-                            println!(
-                                "   WARNING: lever-arm height check off by {:.4} m",
-                                st.max_height_check_m
-                            );
-                        }
+                        let csv = write_outputs(&out, &name, &sol, &filter)?;
+                        print_solution(&sol);
                         println!("   written: {}", csv.display());
                     }
                     Err(e) => {
@@ -287,6 +261,86 @@ fn main() -> Result<()> {
                         failures += 1;
                     }
                 }
+            }
+            std::process::exit(if failures > 0 { 2 } else { 0 });
+        }
+        Command::Shift {
+            dir,
+            from,
+            to,
+            enu,
+            frame,
+            out,
+            roles,
+            tolerance,
+        } => {
+            anyhow::ensure!(dir.is_dir(), "{} is not a folder", dir.display());
+            let spec = match (&from, &to, &enu) {
+                (Some(f), Some(t), None) => ShiftSpec::Points {
+                    from_llh: triplet(f, "--from", "LAT,LON,H")?,
+                    to_llh: triplet(t, "--to", "LAT,LON,H")?,
+                },
+                (None, None, Some(e)) => ShiftSpec::Enu {
+                    enu_m: triplet(e, "--enu", "E,N,U")?,
+                },
+                _ => anyhow::bail!("give either --from and --to, or --enu"),
+            };
+            let [e, n, u] = spec.enu_m();
+            let horizontal = e.hypot(n);
+            anyhow::ensure!(
+                horizontal.hypot(u) < 500.0,
+                "a shift of {:.0} m is not a base correction; check the coordinates",
+                horizontal.hypot(u)
+            );
+            let frame = frame.unwrap_or_else(|| match spec {
+                ShiftSpec::Points { .. } => "as given with --to (frame not stated)".into(),
+                ShiftSpec::Enu { .. } => "shifted RTK positions (frame not stated)".into(),
+            });
+
+            let report = scan(
+                &dir,
+                &ScanOptions {
+                    tolerance_s: tolerance,
+                    ..Default::default()
+                },
+            );
+            print_report(&report);
+            println!(
+                "\nShift East / North / Up: {e:+.3} / {n:+.3} / {u:+.3} m (horizontal {horizontal:.3} m)"
+            );
+            if u.abs() > 5.0 {
+                println!(
+                    "WARNING: vertical shift of {u:.1} m. Are both heights ellipsoidal? An orthometric height \
+                     (CGVD2013) differs from the ellipsoidal one by the geoid height, about -30 m in Quebec."
+                );
+            }
+            if horizontal > 20.0 {
+                println!(
+                    "WARNING: horizontal shift of {horizontal:.1} m. Check that --from and --to are the same \
+                     point and that latitude comes before longitude."
+                );
+            }
+
+            let filter = row_filter(roles);
+            std::fs::create_dir_all(&out).with_context(|| format!("creating {}", out.display()))?;
+            let mut failures = 0;
+            for f in &report.flights {
+                let name = flight_name(&f.dir);
+                println!("\n== Shifting {name}");
+                if f.matching.pairs.is_empty() {
+                    println!("   skipped: no exposure paired with the MRK");
+                    failures += 1;
+                    continue;
+                }
+                let sol = shift_flight(f, &spec, &frame);
+                if sol.stats.exposures_fixed + sol.stats.exposures_float == 0 {
+                    println!("   skipped: no RTK position in the MRK (the aircraft was not in RTK mode)");
+                    failures += 1;
+                    continue;
+                }
+                let csv = write_outputs(&out, &name, &sol, &filter)?;
+                print_solution(&sol);
+                println!("   written: {}", csv.display());
             }
             std::process::exit(if failures > 0 { 2 } else { 0 });
         }
@@ -339,6 +393,108 @@ fn sibling_navs(obs: &Path) -> Vec<PathBuf> {
         .unwrap_or_default();
     v.sort();
     v
+}
+
+/// Parse `A,B,C` into three numbers.
+fn triplet(text: &str, option: &str, layout: &str) -> Result<[f64; 3]> {
+    let v: Vec<f64> = text
+        .split(',')
+        .map(|x| x.trim().parse::<f64>())
+        .collect::<Result<_, _>>()
+        .with_context(|| format!("{option} expects {layout}"))?;
+    anyhow::ensure!(v.len() == 3, "{option} expects {layout}");
+    Ok([v[0], v[1], v[2]])
+}
+
+fn flight_name(dir: &Path) -> String {
+    dir.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "flight".into())
+}
+
+fn row_filter(roles: Vec<String>) -> RowFilter {
+    if roles.is_empty() {
+        RowFilter::All
+    } else {
+        RowFilter::Roles(roles)
+    }
+}
+
+/// Write the CSV, geo.txt, JSON and (when needed) problems files of one flight. Returns the
+/// CSV path.
+fn write_outputs(out: &Path, name: &str, sol: &FlightSolution, filter: &RowFilter) -> Result<PathBuf> {
+    let csv = out.join(format!("{name}_positions.csv"));
+    std::fs::write(&csv, positions_csv(sol, filter))?;
+    std::fs::write(out.join(format!("{name}_geo.txt")), odm_geo_txt(sol, filter))?;
+    std::fs::write(
+        out.join(format!("{name}_solution.json")),
+        serde_json::to_string_pretty(sol)?,
+    )?;
+    if sol.exposures.iter().any(|e| e.problem.is_some()) {
+        std::fs::write(out.join(format!("{name}_problems.csv")), problems_csv(sol))?;
+    }
+    Ok(csv)
+}
+
+fn print_solution(sol: &FlightSolution) {
+    let st = &sol.stats;
+    let med = |k: usize| {
+        median(
+            sol.exposures
+                .iter()
+                .filter_map(|e| e.camera.and_then(|c| c.sigma_enu_m).map(|s| s[k])),
+        )
+    };
+    println!(
+        "   {} exposures: {} fixed, {} float, {} other, {} without position",
+        st.exposures, st.exposures_fixed, st.exposures_float, st.exposures_other, st.exposures_missing
+    );
+    let sigmas = if st.exposures_without_sigma < st.exposures - st.exposures_missing {
+        format!("{:.3} / {:.3} / {:.3} m", med(0), med(1), med(2))
+    } else {
+        "none".into()
+    };
+    match &sol.method {
+        Method::Ppk { .. } => {
+            println!(
+                "   trajectory: {} epochs, {:.1} % fixed; median sigma E/N/U: {sigmas}",
+                st.epochs,
+                100.0 * st.epochs_fixed as f64 / st.epochs.max(1) as f64,
+            );
+            if st.exposures_without_sigma > 0 {
+                println!(
+                    "   WARNING: {} exposure(s) without uncertainty: RTKLIB covariance not \
+                     positive definite (sigma left empty, see problems.csv)",
+                    st.exposures_without_sigma
+                );
+            }
+        }
+        Method::RtkShift(_) => {
+            println!("   median sigma E/N/U from the MRK (relative to the base): {sigmas}");
+            if st.exposures_without_sigma > 0 {
+                println!(
+                    "   WARNING: {} exposure(s) without standard deviations in the MRK (sigma left empty)",
+                    st.exposures_without_sigma
+                );
+            }
+            let not_shifted = sol
+                .exposures
+                .iter()
+                .filter(|e| e.camera.is_none() && e.gps_s.is_some())
+                .count();
+            if not_shifted > 0 {
+                println!(
+                    "   WARNING: {not_shifted} exposure(s) not shifted: no RTK position (see problems.csv)"
+                );
+            }
+        }
+    }
+    if st.max_height_check_m > 0.001 {
+        println!(
+            "   WARNING: lever-arm height check off by {:.4} m",
+            st.max_height_check_m
+        );
+    }
 }
 
 fn median(it: impl Iterator<Item = f64>) -> f64 {

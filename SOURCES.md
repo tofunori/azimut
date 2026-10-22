@@ -70,6 +70,15 @@ Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](
 | `rnx2rtkp -k conf -o out rover base nav...` | `rtklib.rs` | `app/consapp/rnx2rtkp/rnx2rtkp.c` |
 | `convbin -r rtcm3 -tr y/m/d h:m:s -v 3.04 -od -os -o obs -n nav` (RTCM 3 needs an approximate date) | `rtklib.rs` | `app/consapp/convbin/convbin.c` |
 
+## RTK shift
+
+| Rule | Where | Source |
+|---|---|---|
+| MRK latitude, longitude and height are the camera (CMOS) centre in real time, antenna position plus lever arm, with ellipsoidal heights | `rtk_shift.rs` (no lever arm added) | [DJI Phantom 4 RTK white paper](https://shop.quadrocopter.com/assets/images/P4RwhitePaperV2.pdf); [DJI Enterprise Geospatial FAQ](https://enterprise-insights.dji.com/blog/geospatial-solutions-faq) |
+| An RTK rover inherits the offset between the broadcast base position and the true one, so every position moves by that difference; relative precision is unaffected | `rtk_shift.rs` | [Emlid docs, Placing the base](https://docs.emlid.com/reach/common/tutorials/placing-the-base) |
+| Only RTK (fixed, float) positions use the base; single-point positions do not and are not shifted | `rtk_shift.rs` | Same; status codes as in the MRK section |
+| Bulk XYZ shift of RTK positions is an established correction for drone imagery | `rtk_shift.rs` | [REDtoolbox product page](https://gnss.ae/software/redtoolbox/) (feature description only) |
+
 ## Camera centre
 
 | Rule | Where | Source |

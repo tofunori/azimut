@@ -106,8 +106,10 @@ pub struct CameraCentre {
     /// covariance is not positive definite.
     pub sigma_enu_m: Option<[f64; 3]>,
     pub quality: SolQuality,
-    pub n_sats: u32,
-    /// Antenna height minus the Down offset, minus camera height. Should be ~0.
+    /// Satellites used, when the source gives it (the MRK does not).
+    pub n_sats: Option<u32>,
+    /// Antenna height minus the Down offset, minus camera height. Should be ~0; 0 when no
+    /// lever arm was applied.
     pub height_check_m: f64,
 }
 
@@ -128,7 +130,7 @@ pub fn camera_centre(ant: &AntennaFix, offset_ned_mm: [f64; 3]) -> CameraCentre 
             [0, 1, 2].map(|k| enu[k][k].sqrt())
         }),
         quality: ant.quality,
-        n_sats: ant.n_sats,
+        n_sats: Some(ant.n_sats),
         height_check_m: (h_a - ned_m[2]) - h,
     }
 }
