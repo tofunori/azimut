@@ -12,6 +12,7 @@
 <p align="center">
   <b><a href="README.fr.md">Français</a></b> ·
   <a href="docs/guide-labo.md">Guide du labo</a> ·
+  <a href="https://tofunori.github.io/azimut/en/">Website</a> ·
   <a href="#install">Install</a> ·
   <a href="examples">Example outputs</a> ·
   <a href="docs/validation.md">Validation</a> ·
