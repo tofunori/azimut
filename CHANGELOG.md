@@ -17,6 +17,8 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
   interpolated to each file's own exposure time, MRK lever arm.
 - Base position from an NRCan CSRS-PPP summary (`--base-ppp`); RTK flights corrected by a
   base shift (`shift`, `--to-ppp`).
+- CSRS-PPP submission of the base RINEX from Azimut (`ppp`, `process --submit-ppp`): waits
+  for the result, keeps the archive, resumes with the tracking key (`ppp --resume`).
 - CGVD2013 orthometric heights from PROJ geoid grids (`--geoid`), with a frame check.
 - Outputs: positions CSV, OpenDroneMap `geo.txt`, PIX4Dmatic geolocation file, problems list.
 - Quality report in HTML and JSON, in English or French (`--report-lang fr`).

@@ -1,0 +1,18 @@
+[package]
+name = "azimut-csrs"
+description = "Submission of a base-station RINEX to NRCan CSRS-PPP and retrieval of its precise position, for Azimut."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+azimut-io.workspace = true
+thiserror.workspace = true
+ureq.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -72,7 +72,7 @@ azimut process vols/ --base base.24o --base-ppp base.sum --report-lang fr --out 
 | 🔎 **Diagnostic d'abord** | Des cartes SD entières en secondes, par les seuls en-têtes : bandes manquantes, appariement MRK, couverture de la base. |
 | 🛰️ **PPK** | RTKLIB-EX contre votre base, chaque fichier positionné à sa propre heure d'exposition. |
 | 🌈 **Mavic 3M** | Cinq fichiers par capture ; les bandes, exposées 26 ms après l'image RVB, ont leur propre position. |
-| 📍 **CSRS-PPP et RTK** | Position de la base par CSRS-PPP (RNCan) ; vols RTK corrigés du décalage de la base. |
+| 📍 **CSRS-PPP et RTK** | Position de la base par CSRS-PPP (RNCan), soumise par Azimut ou lue d'un rapport ; vols RTK corrigés du décalage de la base. |
 | 📏 **Hauteurs** | Ellipsoïdales ou CGVD2013, en vérifiant que le géoïde correspond au cadre. |
 | 📤 **Sorties** | PIX4Dmatic, Metashape, OpenDroneMap, CSV, et un rapport HTML/JSON. |
 | 🖼️ **Dans les images** | Positions dans l'EXIF et le XMP DJI, sur place (annulable) ou dans des copies, radiométrie intacte. |

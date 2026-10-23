@@ -5,6 +5,7 @@ members = [
     "crates/azimut-solve",
     "crates/azimut-geo",
     "crates/azimut-export",
+    "crates/azimut-csrs",
     "crates/azimut-cli",
 ]
 
@@ -21,6 +22,7 @@ azimut-io = { path = "crates/azimut-io", version = "0.1.0" }
 azimut-solve = { path = "crates/azimut-solve", version = "0.1.0" }
 azimut-export = { path = "crates/azimut-export", version = "0.1.0" }
 azimut-geo = { path = "crates/azimut-geo", version = "0.1.0" }
+azimut-csrs = { path = "crates/azimut-csrs", version = "0.1.0" }
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 quick-xml = "0.37"
 rayon = "1.10"
@@ -31,9 +33,13 @@ thiserror = "2.0"
 # 0.9 keeps the workspace MSRV (0.11 needs Rust 1.85).
 tiff = "0.9"
 walkdir = "2.5"
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 anyhow = "1.0"
 tempfile = "3.13"
+# Blocking HTTP client; 2.x keeps the workspace MSRV (3.x needs Rust 1.85).
+ureq = { version = "2.12", default-features = false, features = ["tls"] }
+# 2.x keeps the workspace MSRV (4.x and later need newer Rust). Deflate only, no crypto.
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
 [profile.release]
 lto = "thin"

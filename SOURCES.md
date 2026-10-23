@@ -81,6 +81,14 @@ Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](
 | Summary files hold the position in more than one system; the `.pos` file only in the one selected | `csrs_ppp.rs` (`--ppp-system`) | [Krcmar, CSRS-PPP: a web tool](https://krcmar.ca/resource-articles/2010_Winter_CSRS-PPP%20-%20A%20web%20tool_0.pdf) |
 | CSRS-PPP estimates the antenna phase centre and reduces it to the mark with the antenna calibration and the RINEX `ANTENNA: DELTA H/E/N` offsets, which the user must check | `config.rs` (`BaseSetup::from_ppp`) | [NRCan, Guidelines for RTK/RTN GNSS Surveying in Canada](https://natural-resources.canada.ca/sites/www.nrcan.gc.ca/files/earthsciences/pdf/Canada%20RTK_UserGuide_v1_2-EN.pdf); [Emlid forum, no antenna type in RINEX](https://community.emlid.com/t/rs2-ppp-problem-no-antenna-type-in-rinex-header/21106) |
 
+## CSRS-PPP service
+
+| Rule | Where | Source |
+|---|---|---|
+| `POST <service>/submit`, multipart form with `return_email`, `user_name`, `cmd_process_type=std`, `ppp_access=nobrowser_status`, `language`, `process_type` (`Static`, `Kinematic`), `sysref` (`ITRF`, `NAD83`), `nad83_epoch=CURR`, `v_datum=cgvd2013`, `output_pdf=lite` and the RINEX in `rfile_upload`, user agent `Mozilla/5.0 (Python CSRS-PPP access)`; the reply is the tracking key as plain text, anything else is a refusal | `azimut-csrs` (`form_fields`, `tracking_key`) | NRCan's `csrs_ppp_auto.py`, distributed from the [CSRS-PPP page](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/tools-outils/ppp.php); own measurement, 2026-10-23 (a base RINEX submitted and its results retrieved) |
+| `GET <service>/results/status?id=<key>` answers `processing` or `done` as plain text; an unknown key gets `error` | `azimut-csrs` (`parse_status`) | Same; `error` measured with an invalid key on 2026-10-23 |
+| `GET <service>/results/file?id=<key>` returns a zip with, for `X.24O`, `X.sum`, `X.pos`, `X.csv`, `X.pdf`, `X.clk`, `X.tro`, `errors.txt`, `output_descriptions.txt`; a 4 to 8 h session at 30 s is done in about a minute | `azimut-csrs` (`extract`) | Own measurement, 2026-10-23 |
+
 ## RTK shift
 
 | Rule | Where | Source |
