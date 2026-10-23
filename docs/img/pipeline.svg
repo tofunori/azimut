@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 210" role="img" aria-label="SD card → Diagnose → PPK → Positions → Your software">
+<style>.card{fill:#ffffff;stroke:#d9dee5}.ic{fill:none;stroke:#2a78d6;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}.dot{fill:#1fb59a}.t{font:600 19px -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#0b2236}.s{font:14px -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#5b6573}.ar{stroke:#9aa4b1;stroke-width:2;fill:none}.ah{fill:#9aa4b1}.hl{fill:#e8f2fc;stroke:#2a78d6}@media (prefers-color-scheme:dark){.card{fill:#161b22;stroke:#30363d}.hl{fill:#10243a;stroke:#3987e5}.t{fill:#f0f3f6}.s{fill:#9da7b3}.ic{stroke:#58a6ff}.ar{stroke:#6e7681}.ah{fill:#6e7681}}</style>
+<rect x="18" y="18" width="184" height="174" rx="16" class="card"/>
+<g transform="translate(110 72)"><path d="M-14 -18 h20 l8 8 v28 h-28 z" class="ic"/><path d="M-8 -12 v6 M-3 -12 v6 M2 -12 v6" class="ic"/></g>
+<text x="110" y="132" text-anchor="middle" class="t">SD card</text>
+<text x="110" y="158" text-anchor="middle" class="s">images, MRK,</text>
+<text x="110" y="177" text-anchor="middle" class="s">GNSS log</text>
+<path d="M206 105 H228" class="ar"/><path d="M234 105 l-8 -5 v10 z" class="ah"/>
+<rect x="238" y="18" width="184" height="174" rx="16" class="card hl"/>
+<g transform="translate(330 72)"><circle cx="-3" cy="-3" r="12" class="ic"/><path d="M6 6 l10 10" class="ic"/><path d="M-9 -3 l4 4 l8 -8" class="ic"/></g>
+<text x="330" y="132" text-anchor="middle" class="t">Diagnose</text>
+<text x="330" y="158" text-anchor="middle" class="s">headers only,</text>
+<text x="330" y="177" text-anchor="middle" class="s">in seconds</text>
+<path d="M426 105 H448" class="ar"/><path d="M454 105 l-8 -5 v10 z" class="ah"/>
+<rect x="458" y="18" width="184" height="174" rx="16" class="card hl"/>
+<g transform="translate(550 72)"><circle r="15" class="ic"/><circle r="7" class="ic"/><circle r="2.5" class="dot"/><path d="M0 -21 v6 M0 15 v6 M-21 0 h6 M15 0 h6" class="ic"/></g>
+<text x="550" y="132" text-anchor="middle" class="t">PPK</text>
+<text x="550" y="158" text-anchor="middle" class="s">RTKLIB-EX +</text>
+<text x="550" y="177" text-anchor="middle" class="s">base station</text>
+<path d="M646 105 H668" class="ar"/><path d="M674 105 l-8 -5 v10 z" class="ah"/>
+<rect x="678" y="18" width="184" height="174" rx="16" class="card"/>
+<g transform="translate(770 72)"><path d="M0 18 C-10 6 -14 0 -14 -6 a14 14 0 0 1 28 0 c0 6 -4 12 -14 24 z" class="ic"/><circle cy="-6" r="5" class="dot"/></g>
+<text x="770" y="132" text-anchor="middle" class="t">Positions</text>
+<text x="770" y="158" text-anchor="middle" class="s">each file, with</text>
+<text x="770" y="177" text-anchor="middle" class="s">uncertainty</text>
+<path d="M866 105 H888" class="ar"/><path d="M894 105 l-8 -5 v10 z" class="ah"/>
+<rect x="898" y="18" width="184" height="174" rx="16" class="card"/>
+<g transform="translate(990 72)"><path d="M0 -16 L18 -7 L0 2 L-18 -7 Z" class="ic"/><path d="M-18 1 L0 10 L18 1" class="ic"/><path d="M-18 9 L0 18 L18 9" class="ic"/></g>
+<text x="990" y="132" text-anchor="middle" class="t">Your software</text>
+<text x="990" y="158" text-anchor="middle" class="s">PIX4D, Metashape,</text>
+<text x="990" y="177" text-anchor="middle" class="s">ODM</text>
+</svg>

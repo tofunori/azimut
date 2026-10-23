@@ -1,0 +1,12 @@
+Importing the positions of DJI_202606151400_001_Demo into PIX4Dmatic
+(steps from PIX4D's documentation, "How to import and export image geolocation and orientation files")
+
+1. Create a new project and import the images of this flight.
+2. File > Import > Image geolocation and orientation, and choose DJI_202606151400_001_Demo_pix4dmatic.csv.
+3. Coordinate reference system: horizontal = the geographic (latitude, longitude) system of
+   the frame below; vertical = ellipsoidal height.
+4. Apply.
+
+Frame of the positions: NAD83(CSRS) v8, epoch 2010.0
+Accuracies: 1-sigma in metres, horizontal radial (sqrt(sE^2 + sN^2)) and vertical.
+The file holds no angles: PIX4Dmatic keeps the orientation read from the images.

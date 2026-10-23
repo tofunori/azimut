@@ -29,7 +29,8 @@ pub use rtklib::Rtklib;
 pub enum SolveError {
     #[error(
         "RTKLIB-EX programs (convbin, rnx2rtkp) not found. Give their folder with --rtklib, \
-         set {} or add them to the PATH.",
+         set {}, put them in an `rtklib` folder next to azimut (as in the release archives) \
+         or add them to the PATH.",
         rtklib::ENV_DIR
     )]
     RtklibNotFound,

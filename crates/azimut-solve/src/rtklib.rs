@@ -34,7 +34,8 @@ fn find_in(dir: &Path, name: &str) -> Option<PathBuf> {
 }
 
 impl Rtklib {
-    /// Find the programs in `dir`, then `$AZIMUT_RTKLIB_DIR`, then the `PATH`.
+    /// Find the programs in `dir`, then `$AZIMUT_RTKLIB_DIR`, then next to the running
+    /// program (and in its `rtklib` subfolder, as in the release archives), then the `PATH`.
     pub fn locate(dir: Option<&Path>) -> Result<Self, SolveError> {
         let mut dirs: Vec<PathBuf> = Vec::new();
         if let Some(d) = dir {
@@ -42,6 +43,13 @@ impl Rtklib {
         }
         if let Some(d) = std::env::var_os(ENV_DIR) {
             dirs.push(PathBuf::from(d));
+        }
+        if let Some(own) = std::env::current_exe()
+            .ok()
+            .and_then(|e| e.parent().map(Path::to_path_buf))
+        {
+            dirs.push(own.join("rtklib"));
+            dirs.push(own);
         }
         if let Some(path) = std::env::var_os("PATH") {
             dirs.extend(std::env::split_paths(&path));

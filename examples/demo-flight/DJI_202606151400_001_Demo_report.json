@@ -1,0 +1,1623 @@
+{
+  "flight": "DJI_202606151400_001_Demo",
+  "dir": "DJI_202606151400_001_Demo",
+  "azimut_version": "0.1.0",
+  "method": "RTK positions shifted by E +0.420 m, N -0.180 m, U +0.650 m",
+  "frame": "NAD83(CSRS) v8, epoch 2010.0",
+  "vertical_datum": null,
+  "base": null,
+  "findings": [
+    {
+      "severity": "warning",
+      "message": "1 of 96 multispectral captures are incomplete: #0006 (missing NIR)."
+    },
+    {
+      "severity": "info",
+      "message": "Image exposure times (XMP UTCAtExposure) read as GPS time, despite the UTC label."
+    },
+    {
+      "severity": "info",
+      "message": "96 of 96 MRK records paired with a capture (largest time gap 0.000000 s)."
+    },
+    {
+      "severity": "info",
+      "message": "Real-time status in the MRK: 97.9 % fixed (94 fixed, 2 float, 0 single, 0 none). PPK will replace these positions."
+    },
+    {
+      "severity": "info",
+      "message": "No base-station RINEX found next to this flight. Give one with --base to check its coverage."
+    }
+  ],
+  "summary": {
+    "exposures": 96,
+    "fixed": 94,
+    "float": 2,
+    "other": 0,
+    "without_position": 0,
+    "files": 479,
+    "files_positioned": 479,
+    "files_without_position": 0,
+    "epochs": 0,
+    "epochs_fixed_pct": null,
+    "sigma_median_enu_m": [
+      0.010522,
+      0.013021,
+      0.021675
+    ],
+    "sigma_p95_enu_m": [
+      0.01296,
+      0.015957,
+      0.026908
+    ],
+    "exposures_without_sigma": 0,
+    "max_height_check_m": 0.0,
+    "first_gps_s": 1465567200.0,
+    "last_gps_s": 1465567390.0
+  },
+  "attention": [
+    {
+      "code": "scan_warnings",
+      "values": [
+        1.0
+      ],
+      "text": "1 warning(s) in the scan."
+    },
+    {
+      "code": "not_fixed",
+      "values": [
+        2.0,
+        2.0,
+        0.0
+      ],
+      "text": "2 exposure(s) not fixed (2 float, 0 other)."
+    }
+  ],
+  "exposures": [
+    {
+      "photo": 1,
+      "gps_s": 1465567200.0,
+      "quality": "fixed",
+      "lat_deg": 46.34999838071616,
+      "lon_deg": -72.54999454367461,
+      "h_m": 120.64999999850988,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012152,
+        0.012,
+        0.022726
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 2,
+      "gps_s": 1465567202.0,
+      "quality": "fixed",
+      "lat_deg": 46.34999838071617,
+      "lon_deg": -72.54970823367465,
+      "h_m": 120.69399999640882,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012469,
+        0.012664,
+        0.023758
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 3,
+      "gps_s": 1465567204.0,
+      "quality": "float",
+      "lat_deg": 46.34999838071619,
+      "lon_deg": -72.54942191367469,
+      "h_m": 120.73799999803305,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012717,
+        0.013309,
+        0.024685
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 4,
+      "gps_s": 1465567206.0,
+      "quality": "float",
+      "lat_deg": 46.34999838071619,
+      "lon_deg": -72.54913560367471,
+      "h_m": 120.78099999856204,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012891,
+        0.013918,
+        0.025483
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 5,
+      "gps_s": 1465567208.0,
+      "quality": "fixed",
+      "lat_deg": 46.3499983807162,
+      "lon_deg": -72.54884928367476,
+      "h_m": 120.82199999690056,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012984,
+        0.014473,
+        0.026129
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 6,
+      "gps_s": 1465567210.0,
+      "quality": "fixed",
+      "lat_deg": 46.349998380716215,
+      "lon_deg": -72.5485629736748,
+      "h_m": 120.86099999770522,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012994,
+        0.014961,
+        0.026605
+      ],
+      "files": 4,
+      "problem": null
+    },
+    {
+      "photo": 7,
+      "gps_s": 1465567212.0,
+      "quality": "fixed",
+      "lat_deg": 46.34999838071622,
+      "lon_deg": -72.54827666367481,
+      "h_m": 120.89699999801815,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012922,
+        0.015366,
+        0.026898
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 8,
+      "gps_s": 1465567214.0,
+      "quality": "fixed",
+      "lat_deg": 46.34999838071624,
+      "lon_deg": -72.54799034367484,
+      "h_m": 120.93099999800324,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012768,
+        0.015678,
+        0.027
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 9,
+      "gps_s": 1465567216.0,
+      "quality": "fixed",
+      "lat_deg": 46.349998380716244,
+      "lon_deg": -72.54770403367488,
+      "h_m": 120.96099999733269,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012538,
+        0.015888,
+        0.026908
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 10,
+      "gps_s": 1465567218.0,
+      "quality": "fixed",
+      "lat_deg": 46.349998380716244,
+      "lon_deg": -72.5474177236749,
+      "h_m": 120.98699999786913,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012237,
+        0.01599,
+        0.026624
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 11,
+      "gps_s": 1465567220.0,
+      "quality": "fixed",
+      "lat_deg": 46.34999838071625,
+      "lon_deg": -72.5471314036749,
+      "h_m": 121.00799999758601,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011875,
+        0.015982,
+        0.026157
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 12,
+      "gps_s": 1465567222.0,
+      "quality": "fixed",
+      "lat_deg": 46.34999838071626,
+      "lon_deg": -72.54684509367493,
+      "h_m": 121.02599999774247,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.01146,
+        0.015863,
+        0.025519
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 13,
+      "gps_s": 1465567224.0,
+      "quality": "fixed",
+      "lat_deg": 46.35031279071635,
+      "lon_deg": -72.54684509364365,
+      "h_m": 121.03899999894202,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011005,
+        0.015637,
+        0.024728
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 14,
+      "gps_s": 1465567226.0,
+      "quality": "fixed",
+      "lat_deg": 46.350312790716345,
+      "lon_deg": -72.54713140364366,
+      "h_m": 121.046999999322,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.010522,
+        0.015311,
+        0.023806
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 15,
+      "gps_s": 1465567228.0,
+      "quality": "fixed",
+      "lat_deg": 46.35031279071635,
+      "lon_deg": -72.54741772364366,
+      "h_m": 121.04999999888241,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.010025,
+        0.014892,
+        0.022779
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 16,
+      "gps_s": 1465567230.0,
+      "quality": "fixed",
+      "lat_deg": 46.35031279071635,
+      "lon_deg": -72.54770403364367,
+      "h_m": 121.04799999855459,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.009527,
+        0.014394,
+        0.021675
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 17,
+      "gps_s": 1465567232.0,
+      "quality": "fixed",
+      "lat_deg": 46.350312790716345,
+      "lon_deg": -72.54799034364366,
+      "h_m": 121.04099999926984,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.009042,
+        0.013829,
+        0.020524
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 18,
+      "gps_s": 1465567234.0,
+      "quality": "fixed",
+      "lat_deg": 46.350312790716345,
+      "lon_deg": -72.54827666364365,
+      "h_m": 121.02999999932945,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008584,
+        0.013214,
+        0.019359
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 19,
+      "gps_s": 1465567236.0,
+      "quality": "fixed",
+      "lat_deg": 46.35031279071634,
+      "lon_deg": -72.54856297364364,
+      "h_m": 121.01399999950081,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008164,
+        0.012564,
+        0.018211
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 20,
+      "gps_s": 1465567238.0,
+      "quality": "fixed",
+      "lat_deg": 46.35031279071634,
+      "lon_deg": -72.54884928364362,
+      "h_m": 120.99299999885261,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007796,
+        0.0119,
+        0.017113
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 21,
+      "gps_s": 1465567240.0,
+      "quality": "fixed",
+      "lat_deg": 46.35031279071634,
+      "lon_deg": -72.54913560364359,
+      "h_m": 120.96799999754876,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007489,
+        0.011238,
+        0.016095
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 22,
+      "gps_s": 1465567242.0,
+      "quality": "fixed",
+      "lat_deg": 46.350312790716316,
+      "lon_deg": -72.54942191364358,
+      "h_m": 120.93899999838322,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007252,
+        0.010597,
+        0.015186
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 23,
+      "gps_s": 1465567244.0,
+      "quality": "fixed",
+      "lat_deg": 46.35031279071631,
+      "lon_deg": -72.54970823364354,
+      "h_m": 120.90699999872595,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.00709,
+        0.009995,
+        0.014409
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 24,
+      "gps_s": 1465567246.0,
+      "quality": "fixed",
+      "lat_deg": 46.3503127907163,
+      "lon_deg": -72.54999454364352,
+      "h_m": 120.87099999841303,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007009,
+        0.009448,
+        0.013788
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 25,
+      "gps_s": 1465567248.0,
+      "quality": "fixed",
+      "lat_deg": 46.35062720071638,
+      "lon_deg": -72.5499945436122,
+      "h_m": 120.83299999777228,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007012,
+        0.008973,
+        0.013339
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 26,
+      "gps_s": 1465567250.0,
+      "quality": "fixed",
+      "lat_deg": 46.35062720071636,
+      "lon_deg": -72.54970823361217,
+      "h_m": 120.79199999663979,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007096,
+        0.008581,
+        0.013074
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 27,
+      "gps_s": 1465567252.0,
+      "quality": "fixed",
+      "lat_deg": 46.35062720071636,
+      "lon_deg": -72.54942191361214,
+      "h_m": 120.74999999627471,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007262,
+        0.008284,
+        0.013002
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 28,
+      "gps_s": 1465567254.0,
+      "quality": "fixed",
+      "lat_deg": 46.35062720071634,
+      "lon_deg": -72.54913560361209,
+      "h_m": 120.70599999744445,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007503,
+        0.00809,
+        0.013123
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 29,
+      "gps_s": 1465567256.0,
+      "quality": "fixed",
+      "lat_deg": 46.35062720071633,
+      "lon_deg": -72.54884928361206,
+      "h_m": 120.66199999954551,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007814,
+        0.008004,
+        0.013435
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 30,
+      "gps_s": 1465567258.0,
+      "quality": "fixed",
+      "lat_deg": 46.350627200716325,
+      "lon_deg": -72.54856297361202,
+      "h_m": 120.61799999885261,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008185,
+        0.008029,
+        0.013929
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 31,
+      "gps_s": 1465567260.0,
+      "quality": "fixed",
+      "lat_deg": 46.35062720071631,
+      "lon_deg": -72.54827666361196,
+      "h_m": 120.5739999981597,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008606,
+        0.008164,
+        0.014591
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 32,
+      "gps_s": 1465567262.0,
+      "quality": "fixed",
+      "lat_deg": 46.350627200716296,
+      "lon_deg": -72.54799034361193,
+      "h_m": 120.53099999763072,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.009066,
+        0.008406,
+        0.015403
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 33,
+      "gps_s": 1465567264.0,
+      "quality": "fixed",
+      "lat_deg": 46.35062720071628,
+      "lon_deg": -72.5477040336119,
+      "h_m": 120.48899999819696,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.009552,
+        0.008747,
+        0.016342
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 34,
+      "gps_s": 1465567266.0,
+      "quality": "fixed",
+      "lat_deg": 46.350627200716275,
+      "lon_deg": -72.54741772361187,
+      "h_m": 120.4489999981597,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.01005,
+        0.009178,
+        0.017383
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 35,
+      "gps_s": 1465567268.0,
+      "quality": "fixed",
+      "lat_deg": 46.35062720071626,
+      "lon_deg": -72.54713140361183,
+      "h_m": 120.41199999954551,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.010547,
+        0.009687,
+        0.018496
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 36,
+      "gps_s": 1465567270.0,
+      "quality": "fixed",
+      "lat_deg": 46.35062720071626,
+      "lon_deg": -72.54684509361181,
+      "h_m": 120.3779999986291,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011029,
+        0.010261,
+        0.019651
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 37,
+      "gps_s": 1465567272.0,
+      "quality": "fixed",
+      "lat_deg": 46.35094161071634,
+      "lon_deg": -72.54684509358049,
+      "h_m": 120.34699999820441,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011482,
+        0.010882,
+        0.020816
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 38,
+      "gps_s": 1465567274.0,
+      "quality": "fixed",
+      "lat_deg": 46.35094161071633,
+      "lon_deg": -72.54713140358047,
+      "h_m": 120.31999999750406,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011894,
+        0.011535,
+        0.021958
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 39,
+      "gps_s": 1465567276.0,
+      "quality": "fixed",
+      "lat_deg": 46.35094161071633,
+      "lon_deg": -72.54741772358045,
+      "h_m": 120.29699999839067,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012254,
+        0.012201,
+        0.023046
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 40,
+      "gps_s": 1465567278.0,
+      "quality": "fixed",
+      "lat_deg": 46.350941610716326,
+      "lon_deg": -72.54770403358043,
+      "h_m": 120.2779999980703,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012551,
+        0.01286,
+        0.024049
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 41,
+      "gps_s": 1465567280.0,
+      "quality": "fixed",
+      "lat_deg": 46.35094161071633,
+      "lon_deg": -72.54799034358042,
+      "h_m": 120.26399999950081,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012778,
+        0.013497,
+        0.02494
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 42,
+      "gps_s": 1465567282.0,
+      "quality": "fixed",
+      "lat_deg": 46.350941610716326,
+      "lon_deg": -72.5482766635804,
+      "h_m": 120.25499999895692,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012927,
+        0.014091,
+        0.025695
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 43,
+      "gps_s": 1465567284.0,
+      "quality": "fixed",
+      "lat_deg": 46.350941610716326,
+      "lon_deg": -72.54856297358042,
+      "h_m": 120.24999999813735,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012996,
+        0.014628,
+        0.026291
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 44,
+      "gps_s": 1465567286.0,
+      "quality": "fixed",
+      "lat_deg": 46.350941610716326,
+      "lon_deg": -72.54884928358041,
+      "h_m": 120.25099999830127,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012981,
+        0.015092,
+        0.026713
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 45,
+      "gps_s": 1465567288.0,
+      "quality": "fixed",
+      "lat_deg": 46.350941610716326,
+      "lon_deg": -72.54913560358041,
+      "h_m": 120.25599999818951,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012884,
+        0.01547,
+        0.026949
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 46,
+      "gps_s": 1465567290.0,
+      "quality": "fixed",
+      "lat_deg": 46.35094161071633,
+      "lon_deg": -72.54942191358043,
+      "h_m": 120.26599999982864,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012707,
+        0.015752,
+        0.026993
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 47,
+      "gps_s": 1465567292.0,
+      "quality": "fixed",
+      "lat_deg": 46.350941610716326,
+      "lon_deg": -72.54970823358043,
+      "h_m": 120.28099999856204,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012454,
+        0.01593,
+        0.026842
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 48,
+      "gps_s": 1465567294.0,
+      "quality": "fixed",
+      "lat_deg": 46.35094161071633,
+      "lon_deg": -72.54999454358047,
+      "h_m": 120.300999998115,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012134,
+        0.015999,
+        0.026502
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 49,
+      "gps_s": 1465567296.0,
+      "quality": "fixed",
+      "lat_deg": 46.35125602071644,
+      "lon_deg": -72.54999454354919,
+      "h_m": 120.3249999973923,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011755,
+        0.015957,
+        0.025982
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 50,
+      "gps_s": 1465567298.0,
+      "quality": "fixed",
+      "lat_deg": 46.35125602071643,
+      "lon_deg": -72.54970823354921,
+      "h_m": 120.35199999809265,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011327,
+        0.015806,
+        0.025296
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 51,
+      "gps_s": 1465567300.0,
+      "quality": "fixed",
+      "lat_deg": 46.35125602071644,
+      "lon_deg": -72.54942191354925,
+      "h_m": 120.38399999868125,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.010862,
+        0.015549,
+        0.024464
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 52,
+      "gps_s": 1465567302.0,
+      "quality": "fixed",
+      "lat_deg": 46.351256020716455,
+      "lon_deg": -72.54913560354926,
+      "h_m": 120.41899999883026,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.010373,
+        0.015194,
+        0.023507
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 53,
+      "gps_s": 1465567304.0,
+      "quality": "fixed",
+      "lat_deg": 46.35125602071646,
+      "lon_deg": -72.54884928354929,
+      "h_m": 120.45599999744445,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.009874,
+        0.01475,
+        0.022454
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 54,
+      "gps_s": 1465567306.0,
+      "quality": "fixed",
+      "lat_deg": 46.35125602071647,
+      "lon_deg": -72.54856297354934,
+      "h_m": 120.49599999841303,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.009379,
+        0.01423,
+        0.021332
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 55,
+      "gps_s": 1465567308.0,
+      "quality": "fixed",
+      "lat_deg": 46.351256020716484,
+      "lon_deg": -72.54827666354936,
+      "h_m": 120.5379999987781,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008901,
+        0.013648,
+        0.020173
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 56,
+      "gps_s": 1465567310.0,
+      "quality": "fixed",
+      "lat_deg": 46.3512560207165,
+      "lon_deg": -72.5479903435494,
+      "h_m": 120.58199999760836,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008453,
+        0.013021,
+        0.01901
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 57,
+      "gps_s": 1465567312.0,
+      "quality": "fixed",
+      "lat_deg": 46.351256020716505,
+      "lon_deg": -72.54770403354944,
+      "h_m": 120.62599999736995,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008048,
+        0.012365,
+        0.017874
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 58,
+      "gps_s": 1465567314.0,
+      "quality": "fixed",
+      "lat_deg": 46.35125602071652,
+      "lon_deg": -72.54741772354949,
+      "h_m": 120.6699999962002,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007697,
+        0.011699,
+        0.016797
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 59,
+      "gps_s": 1465567316.0,
+      "quality": "fixed",
+      "lat_deg": 46.35125602071652,
+      "lon_deg": -72.5471314035495,
+      "h_m": 120.71399999782443,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.00741,
+        0.011042,
+        0.015809
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 60,
+      "gps_s": 1465567318.0,
+      "quality": "fixed",
+      "lat_deg": 46.35125602071655,
+      "lon_deg": -72.54684509354955,
+      "h_m": 120.75799999758601,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007195,
+        0.010411,
+        0.014937
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 61,
+      "gps_s": 1465567320.0,
+      "quality": "fixed",
+      "lat_deg": 46.351570420716655,
+      "lon_deg": -72.5468450935183,
+      "h_m": 120.79999999888241,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007057,
+        0.009824,
+        0.014205
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 62,
+      "gps_s": 1465567322.0,
+      "quality": "fixed",
+      "lat_deg": 46.351570420716655,
+      "lon_deg": -72.54713140351834,
+      "h_m": 120.83999999798834,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007001,
+        0.009297,
+        0.013634
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 63,
+      "gps_s": 1465567324.0,
+      "quality": "fixed",
+      "lat_deg": 46.35157042071667,
+      "lon_deg": -72.54741772351838,
+      "h_m": 120.87799999956042,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007028,
+        0.008846,
+        0.013239
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 64,
+      "gps_s": 1465567326.0,
+      "quality": "fixed",
+      "lat_deg": 46.351570420716676,
+      "lon_deg": -72.5477040335184,
+      "h_m": 120.91299999784678,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007138,
+        0.008481,
+        0.013032
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 65,
+      "gps_s": 1465567328.0,
+      "quality": "fixed",
+      "lat_deg": 46.35157042071667,
+      "lon_deg": -72.54799034351842,
+      "h_m": 120.9449999993667,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007327,
+        0.008214,
+        0.013018
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 66,
+      "gps_s": 1465567330.0,
+      "quality": "fixed",
+      "lat_deg": 46.35157042071669,
+      "lon_deg": -72.54827666351844,
+      "h_m": 120.972999997437,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.00759,
+        0.008053,
+        0.013197
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 67,
+      "gps_s": 1465567332.0,
+      "quality": "fixed",
+      "lat_deg": 46.351570420716705,
+      "lon_deg": -72.54856297351847,
+      "h_m": 120.99699999857694,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007919,
+        0.008,
+        0.013565
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 68,
+      "gps_s": 1465567334.0,
+      "quality": "fixed",
+      "lat_deg": 46.3515704207167,
+      "lon_deg": -72.54884928351849,
+      "h_m": 121.01699999999255,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008307,
+        0.008058,
+        0.014111
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 69,
+      "gps_s": 1465567336.0,
+      "quality": "fixed",
+      "lat_deg": 46.351570420716705,
+      "lon_deg": -72.5491356035185,
+      "h_m": 121.03199999872595,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008741,
+        0.008226,
+        0.01482
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 70,
+      "gps_s": 1465567338.0,
+      "quality": "fixed",
+      "lat_deg": 46.35157042071671,
+      "lon_deg": -72.54942191351853,
+      "h_m": 121.04299999866635,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.00921,
+        0.008498,
+        0.015673
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 71,
+      "gps_s": 1465567340.0,
+      "quality": "fixed",
+      "lat_deg": 46.35157042071671,
+      "lon_deg": -72.54970823351852,
+      "h_m": 121.0489999987185,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.009701,
+        0.008867,
+        0.016646
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 72,
+      "gps_s": 1465567342.0,
+      "quality": "fixed",
+      "lat_deg": 46.35157042071671,
+      "lon_deg": -72.54999454351852,
+      "h_m": 121.04999999981374,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.010201,
+        0.009323,
+        0.017712
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 73,
+      "gps_s": 1465567344.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071679,
+      "lon_deg": -72.54999454348722,
+      "h_m": 121.04599999729544,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.010695,
+        0.009854,
+        0.018841
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 74,
+      "gps_s": 1465567346.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071679,
+      "lon_deg": -72.54970823348721,
+      "h_m": 121.03699999768287,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011169,
+        0.010443,
+        0.020002
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 75,
+      "gps_s": 1465567348.0,
+      "quality": "fixed",
+      "lat_deg": 46.351884830716784,
+      "lon_deg": -72.54942191348722,
+      "h_m": 121.02299999818206,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011611,
+        0.011076,
+        0.021163
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 76,
+      "gps_s": 1465567350.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071679,
+      "lon_deg": -72.54913560348717,
+      "h_m": 121.0049999980256,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012009,
+        0.011735,
+        0.022292
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 77,
+      "gps_s": 1465567352.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071677,
+      "lon_deg": -72.54884928348717,
+      "h_m": 120.98199999891222,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012351,
+        0.012401,
+        0.023358
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 78,
+      "gps_s": 1465567354.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071678,
+      "lon_deg": -72.54856297348715,
+      "h_m": 120.95599999837577,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012627,
+        0.013055,
+        0.02433
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 79,
+      "gps_s": 1465567356.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071677,
+      "lon_deg": -72.54827666348712,
+      "h_m": 120.92499999795109,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012831,
+        0.013681,
+        0.025183
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 80,
+      "gps_s": 1465567358.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071675,
+      "lon_deg": -72.54799034348709,
+      "h_m": 120.89099999889731,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012957,
+        0.01426,
+        0.025891
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 81,
+      "gps_s": 1465567360.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071675,
+      "lon_deg": -72.54770403348705,
+      "h_m": 120.85399999748915,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.013,
+        0.014776,
+        0.026437
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 82,
+      "gps_s": 1465567362.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071674,
+      "lon_deg": -72.54741772348703,
+      "h_m": 120.81499999761581,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.01296,
+        0.015215,
+        0.026804
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 83,
+      "gps_s": 1465567364.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071673,
+      "lon_deg": -72.54713140348699,
+      "h_m": 120.77299999725074,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012839,
+        0.015565,
+        0.026983
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 84,
+      "gps_s": 1465567366.0,
+      "quality": "fixed",
+      "lat_deg": 46.35188483071671,
+      "lon_deg": -72.54684509348695,
+      "h_m": 120.72999999765307,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012638,
+        0.015817,
+        0.026968
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 85,
+      "gps_s": 1465567368.0,
+      "quality": "fixed",
+      "lat_deg": 46.352199240716786,
+      "lon_deg": -72.54684509345562,
+      "h_m": 120.68699999898672,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012365,
+        0.015962,
+        0.02676
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 86,
+      "gps_s": 1465567370.0,
+      "quality": "fixed",
+      "lat_deg": 46.35219924071678,
+      "lon_deg": -72.54713140345558,
+      "h_m": 120.64199999719858,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.012026,
+        0.015998,
+        0.026364
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 87,
+      "gps_s": 1465567372.0,
+      "quality": "fixed",
+      "lat_deg": 46.35219924071677,
+      "lon_deg": -72.54741772345555,
+      "h_m": 120.59799999650568,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.011631,
+        0.015923,
+        0.025792
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 88,
+      "gps_s": 1465567374.0,
+      "quality": "fixed",
+      "lat_deg": 46.35219924071675,
+      "lon_deg": -72.54770403345552,
+      "h_m": 120.55399999860674,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.01119,
+        0.01574,
+        0.02506
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 89,
+      "gps_s": 1465567376.0,
+      "quality": "fixed",
+      "lat_deg": 46.352199240716736,
+      "lon_deg": -72.54799034345548,
+      "h_m": 120.51199999731034,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.010717,
+        0.015452,
+        0.024188
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 90,
+      "gps_s": 1465567378.0,
+      "quality": "fixed",
+      "lat_deg": 46.352199240716736,
+      "lon_deg": -72.54827666345543,
+      "h_m": 120.47099999710917,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.010224,
+        0.015069,
+        0.023199
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 91,
+      "gps_s": 1465567380.0,
+      "quality": "fixed",
+      "lat_deg": 46.35219924071672,
+      "lon_deg": -72.54856297345542,
+      "h_m": 120.43199999816716,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.009724,
+        0.014601,
+        0.022122
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 92,
+      "gps_s": 1465567382.0,
+      "quality": "fixed",
+      "lat_deg": 46.35219924071671,
+      "lon_deg": -72.54884928345538,
+      "h_m": 120.39699999801815,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.009233,
+        0.014061,
+        0.020986
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 93,
+      "gps_s": 1465567384.0,
+      "quality": "fixed",
+      "lat_deg": 46.35219924071671,
+      "lon_deg": -72.54913560345534,
+      "h_m": 120.36399999726564,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008762,
+        0.013464,
+        0.019822
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 94,
+      "gps_s": 1465567386.0,
+      "quality": "fixed",
+      "lat_deg": 46.3521992407167,
+      "lon_deg": -72.54942191345533,
+      "h_m": 120.33499999623746,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.008326,
+        0.012826,
+        0.018664
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 95,
+      "gps_s": 1465567388.0,
+      "quality": "fixed",
+      "lat_deg": 46.35219924071669,
+      "lon_deg": -72.54970823345532,
+      "h_m": 120.30899999849498,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007936,
+        0.012165,
+        0.017543
+      ],
+      "files": 5,
+      "problem": null
+    },
+    {
+      "photo": 96,
+      "gps_s": 1465567390.0,
+      "quality": "fixed",
+      "lat_deg": 46.35219924071669,
+      "lon_deg": -72.54999454345528,
+      "h_m": 120.28799999784678,
+      "orthometric_h_m": null,
+      "sigma_enu_m": [
+        0.007603,
+        0.0115,
+        0.016489
+      ],
+      "files": 5,
+      "problem": null
+    }
+  ],
+  "outputs": [
+    "en/DJI_202606151400_001_Demo_positions.csv",
+    "en/DJI_202606151400_001_Demo_geo.txt",
+    "en/DJI_202606151400_001_Demo_pix4dmatic.csv",
+    "en/DJI_202606151400_001_Demo_pix4dmatic.txt",
+    "en/DJI_202606151400_001_Demo_solution.json",
+    "en/DJI_202606151400_001_Demo_report.json",
+    "en/DJI_202606151400_001_Demo_report.html"
+  ],
+  "images": null
+}

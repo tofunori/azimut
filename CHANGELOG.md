@@ -18,6 +18,8 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
   (`--write-images`, `write-images`).
 - MCP server for agents (`azimut mcp`).
 - Synthetic DJI flights for tests and demonstrations (`demo`, `demo --survey`).
+- Release archives for Linux, macOS and Windows with RTKLIB-EX included, found next to
+  `azimut`; one-line install scripts; a French lab guide; example outputs.
 
 ### Checked on real data
 - A full Mavic 3M flight (450 captures) processed against an IGS station; see
