@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use Azimut in research, please cite it as below, and cite RTKLIB-EX for the GNSS engine."
+title: "Azimut: open-source PPK geotagging for DJI survey drones"
+type: software
+authors:
+  - name: "GlacioLab, Université du Québec à Trois-Rivières"
+repository-code: "https://github.com/tofunori/azimut"
+license: BSD-2-Clause
+version: 0.1.0
+keywords:
+  - PPK
+  - GNSS
+  - photogrammetry
+  - drone
+  - DJI
+  - Mavic 3M
+  - multispectral
+  - geotagging
+  - RTKLIB

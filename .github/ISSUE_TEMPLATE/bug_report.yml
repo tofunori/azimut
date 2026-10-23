@@ -1,0 +1,30 @@
+name: Bug report
+description: Something Azimut does wrong or refuses to do
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The console output, and the `_report.json` or `scan --json` file if you can share it.
+      render: text
+  - type: input
+    id: drone
+    attributes:
+      label: Drone, camera and firmware
+      placeholder: Mavic 3M, firmware 11.08.01.41
+  - type: input
+    id: version
+    attributes:
+      label: Azimut version and system
+      placeholder: azimut 0.1.0 on Windows 11
+  - type: markdown
+    attributes:
+      value: Do not attach survey data you are not allowed to share. Header-only extracts (MRK, `scan --json`) are usually enough.
