@@ -17,8 +17,9 @@ opts="-DTRACE -DENAGLO -DENAQZS -DENAGAL -DENACMP -DENAIRN -DNFREQ=4 -DNEXOBS=3"
 cflags="-std=c99 -O3 -w -I$src $opts ${EXTRA_CFLAGS:-}"
 exe=""
 libs="-lm"
-case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*) exe=".exe"; libs="-static -lws2_32 -lwinmm -lm" ;;
+# MinGW defines _WIN32 but RTKLIB-EX tests WIN32 (its own Windows makefiles pass -DWIN32).
+case "$("$cc" -dumpmachine)" in
+  *mingw*|*cygwin*|*windows*) exe=".exe"; cflags="$cflags -DWIN32"; libs="-static -lws2_32 -lwinmm -lm" ;;
 esac
 
 common="rtkcmn trace rinex sbas preceph pntpos ephemeris ionex rtcm rtcm2 rtcm3 rtcm3e sofa"
