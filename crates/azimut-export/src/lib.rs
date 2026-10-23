@@ -393,8 +393,15 @@ mod tests {
         let html = r.html();
         assert!(html.starts_with("<!doctype html>"));
         assert!(html.contains("exposure outside the PPK trajectory"));
-        assert!(html.contains("<circle class=\"fixed\""));
+        assert!(
+            html.contains("<g class=\"mark fixed\">"),
+            "status by shape and colour"
+        );
+        assert!(html.contains("class=\"chart\""), "uncertainty chart");
         assert!(!html.contains("<script"), "self-contained, no scripts");
+        let fr = r.html_in(crate::report::Lang::Fr);
+        assert!(fr.contains("<html lang=\"fr\">") && fr.contains("Rapport de qualité"));
+        assert!(fr.contains("46,35000000"), "French decimal comma");
         let json = serde_json::to_string(&r).unwrap();
         let back: FlightReport = serde_json::from_str(&json).unwrap();
         assert_eq!(back.exposures.len(), 2);
