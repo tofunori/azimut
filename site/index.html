@@ -16,215 +16,127 @@
 </head>
 <body>
 
-<header class="top">
+<header>
   <div class="wrap">
     <a class="brand" href="./"><img src="img/logo.svg" alt="">Azimut</a>
     <nav>
-      <a href="#installer">Installer</a>
-      <a href="#rapport">Rapport</a>
-      <a href="#validation">Validation</a>
-      <a href="#docs">Docs</a>
-      <a class="gh" href="https://github.com/tofunori/azimut">GitHub</a>
-      <a class="lang" href="en/" hreflang="en" lang="en">EN</a>
+      <a class="opt" href="#installer">Installer</a>
+      <a class="opt" href="#rapport">Rapport</a>
+      <a class="opt" href="#validation">Validation</a>
+      <a href="https://github.com/tofunori/azimut">GitHub</a>
+      <a href="en/" hreflang="en" lang="en">EN</a>
     </nav>
   </div>
 </header>
 
+<main class="wrap">
+
 <div class="hero">
-  <div class="wrap">
-    <div>
-      <h1>Des positions de caméra <span>précises</span>, vérifiées, documentées.</h1>
-      <p class="lead">Azimut transforme le dossier d'un vol DJI et une station de base en positions prêtes pour PIX4D, Metashape et OpenDroneMap : PPK, incertitudes, cadre de référence, hauteurs CGVD2013 et un rapport de qualité lisible.</p>
-      <div class="btns">
-        <a class="btn primary" href="#installer">Installer Azimut</a>
-        <a class="btn ghost" href="exemples/rapport-fr.html">Voir un rapport</a>
-      </div>
-      <p class="meta">Logiciel libre (BSD 2-Clause) · Windows, macOS, Linux · GlacioLab, UQTR</p>
-    </div>
-    <svg class="flight" viewBox="0 0 380 300" role="img" aria-label="Lignes de vol d'un levé, chaque point est une position de caméra">
-      <g fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="2">
-        <path d="M30 30 H350 V90 H30 V150 H350 V210 H30 V270 H350"/>
-      </g>
-      <g fill="#3fd0b0">
-        <circle cx="30" cy="30" r="5"/><circle cx="83" cy="30" r="5"/><circle cx="136" cy="30" r="5"/><circle cx="190" cy="30" r="5"/><circle cx="243" cy="30" r="5"/><circle cx="296" cy="30" r="5"/><circle cx="350" cy="30" r="5"/>
-        <circle cx="30" cy="90" r="5"/><circle cx="83" cy="90" r="5"/><circle cx="136" cy="90" r="5"/><circle cx="190" cy="90" r="5"/><circle cx="243" cy="90" r="5"/><circle cx="296" cy="90" r="5"/><circle cx="350" cy="90" r="5"/>
-        <circle cx="30" cy="150" r="5"/><circle cx="83" cy="150" r="5"/><circle cx="136" cy="150" r="5"/><circle cx="243" cy="150" r="5"/><circle cx="296" cy="150" r="5"/><circle cx="350" cy="150" r="5"/>
-        <circle cx="30" cy="210" r="5"/><circle cx="83" cy="210" r="5"/><circle cx="136" cy="210" r="5"/><circle cx="190" cy="210" r="5"/><circle cx="243" cy="210" r="5"/><circle cx="296" cy="210" r="5"/><circle cx="350" cy="210" r="5"/>
-        <circle cx="30" cy="270" r="5"/><circle cx="83" cy="270" r="5"/><circle cx="136" cy="270" r="5"/><circle cx="190" cy="270" r="5"/><circle cx="243" cy="270" r="5"/><circle cx="296" cy="270" r="5"/><circle cx="350" cy="270" r="5"/>
-      </g>
-      <circle cx="190" cy="150" r="22" fill="#3fd0b0" fill-opacity=".12" stroke="#3fd0b0" stroke-opacity=".5" stroke-dasharray="3 4"/>
-      <circle cx="190" cy="150" r="8" fill="#fff"/>
-      <circle cx="190" cy="150" r="3.2" fill="#2a78d6"/>
-      <g font-family="system-ui, sans-serif" font-size="12" fill="#fff">
-        <rect x="212" y="114" width="130" height="40" rx="8" fill="#0b2236" fill-opacity=".85" stroke="#fff" stroke-opacity=".2"/>
-        <text x="222" y="131" font-weight="700">Fixée · 0,4 cm H</text>
-        <text x="222" y="146" fill-opacity=".7">0,5 cm V · CGVD2013</text>
-      </g>
-    </svg>
+  <h1>Positions de caméra précises pour drones DJI.</h1>
+  <p>Un vol DJI et une station de base deviennent des positions vérifiées, avec incertitude, cadre de référence et hauteurs CGVD2013, prêtes pour PIX4D, Metashape et OpenDroneMap.</p>
+  <div class="cmd"><span class="os">macOS · Linux</span><code>curl -fsSL https://raw.githubusercontent.com/tofunori/azimut/main/scripts/install.sh | sh</code></div>
+  <div class="cmd"><span class="os">Windows</span><code>irm https://raw.githubusercontent.com/tofunori/azimut/main/scripts/install.ps1 | iex</code></div>
+  <div class="cta">
+    <a class="primary" href="exemples/rapport-fr.html">Voir un rapport</a>
+    <a class="secondary" href="https://github.com/tofunori/azimut/releases/latest">Télécharger v0.1.0</a>
+    <a class="secondary" href="https://github.com/tofunori/azimut/blob/main/docs/guide-labo.md">Guide du labo</a>
   </div>
 </div>
 
-<div class="stats">
-  <div class="wrap">
-    <div class="grid">
-      <div class="stat"><b>450 / 450</b><span>captures fixées sur un vol Mavic 3M réel</span></div>
-      <div class="stat"><b>0,4 cm</b><span>incertitude horizontale médiane (1σ)</span></div>
-      <div class="stat"><b>&lt; 1 min</b><span>pour diagnostiquer une carte SD entière</span></div>
-      <div class="stat"><b>1 ligne</b><span>pour installer, RTKLIB-EX inclus</span></div>
-    </div>
-  </div>
+<div class="figures">
+  <div><b>450/450</b><span>captures fixées, vol réel</span></div>
+  <div><b>0,4 cm</b><span>incertitude H médiane, 1σ</span></div>
+  <div><b>0,05 mm</b><span>écart à PROJ, CGVD2013</span></div>
+  <div><b>1</b><span>ligne pour installer</span></div>
 </div>
-
-<main>
-
-<section>
-  <div class="wrap">
-    <p class="kicker">Le principe</p>
-    <h2>De la carte SD à vos logiciels de photogrammétrie</h2>
-    <p class="sub">Azimut vérifie d'abord, calcule ensuite, et dit toujours ce qu'il a fait : chaque position porte son statut, son incertitude et son cadre de référence.</p>
-    <div class="card pipeline"><img src="img/pipeline-fr.svg" alt="Carte SD → diagnostic → PPK → positions → vos logiciels"></div>
-  </div>
-</section>
 
 <section id="installer">
-  <div class="wrap">
-    <p class="kicker">Installer</p>
-    <h2>Une ligne, et c'est prêt</h2>
-    <p class="sub">Coller la commande dans un terminal. Le moteur GNSS RTKLIB-EX est inclus ; rien d'autre à installer.</p>
-    <div class="install">
-      <div class="card os">
-        <h3>Windows</h3>
-        <p>Ouvrir <b>PowerShell</b> et coller :</p>
-        <div class="cmd"><pre><code>irm https://raw.githubusercontent.com/tofunori/azimut/main/scripts/install.ps1 | iex</code></pre><button type="button" hidden>Copier</button></div>
-      </div>
-      <div class="card os">
-        <h3>macOS · Linux</h3>
-        <p>Ouvrir le <b>Terminal</b> et coller :</p>
-        <div class="cmd"><pre><code>curl -fsSL https://raw.githubusercontent.com/tofunori/azimut/main/scripts/install.sh | sh</code></pre><button type="button" hidden>Copier</button></div>
-      </div>
+  <p class="label"><b>01</b>Utiliser</p>
+  <h2>Trois commandes par vol.</h2>
+  <p class="lede">La copie de la carte SD, le RINEX de la base et, idéalement, le rapport CSRS-PPP de cette base. RTKLIB-EX est inclus.</p>
+  <div class="rows">
+    <div class="row">
+      <div><span class="num">a</span>Diagnostiquer</div>
+      <div><p>Bandes manquantes, appariement MRK, couverture de la base. Rien n'est modifié.</p>
+        <div class="cmd"><code>azimut scan vols/ --base base.24o</code></div></div>
     </div>
-    <div class="card downloads">
-      <b>Ou télécharger l'archive :</b>
-      <a href="https://github.com/tofunori/azimut/releases/latest/download/azimut-x86_64-pc-windows-msvc.zip">Windows</a>
-      <a href="https://github.com/tofunori/azimut/releases/latest/download/azimut-aarch64-apple-darwin.tar.gz">macOS Apple silicon</a>
-      <a href="https://github.com/tofunori/azimut/releases/latest/download/azimut-x86_64-apple-darwin.tar.gz">macOS Intel</a>
-      <a href="https://github.com/tofunori/azimut/releases/latest/download/azimut-x86_64-unknown-linux-gnu.tar.gz">Linux</a>
-      <a href="https://github.com/tofunori/azimut/releases">Toutes les versions →</a>
+    <div class="row">
+      <div><span class="num">b</span>Calculer</div>
+      <div><p>PPK contre la base, hauteurs CGVD2013, rapport en français.</p>
+        <div class="cmd block"><code>azimut process vols/ --base base.24o --base-ppp base.sum \
+  --geoid ca_nrc_CGG2013an83.tif --report-lang fr --out resultats</code></div></div>
     </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <p class="kicker">Utiliser</p>
-    <h2>Trois commandes pour un vol</h2>
-    <p class="sub">Il faut la copie de la carte SD du drone, le RINEX de la station de base et, idéalement, le rapport CSRS-PPP de cette base. Pas à pas : le <a href="https://github.com/tofunori/azimut/blob/main/docs/guide-labo.md">guide du labo</a>.</p>
-    <div class="steps">
-      <div class="card step">
-        <h3>Diagnostiquer</h3>
-        <p>Bandes manquantes, appariement MRK, couverture de la base. Rien n'est modifié.</p>
-        <div class="cmd"><pre><code>azimut scan vols/ --base base.24o</code></pre></div>
-      </div>
-      <div class="card step">
-        <h3>Calculer</h3>
-        <p>PPK contre la base, hauteurs CGVD2013, rapport en français.</p>
-        <div class="cmd"><pre><code>azimut process vols/ --base base.24o \
-  --base-ppp base.sum --geoid ca_nrc_CGG2013an83.tif \
-  --report-lang fr --out resultats</code></pre></div>
-      </div>
-      <div class="card step">
-        <h3>Utiliser</h3>
-        <p>Importer dans PIX4Dmatic, Metashape ou ODM, ou écrire dans des copies des images.</p>
-        <div class="cmd"><pre><code>azimut write-images \
-  resultats/vol_solution.json --mode copy</code></pre></div>
-      </div>
+    <div class="row">
+      <div><span class="num">c</span>Utiliser</div>
+      <div><p>Importer dans PIX4Dmatic, Metashape ou ODM, ou écrire dans des copies des images.</p>
+        <div class="cmd"><code>azimut write-images resultats/vol_solution.json --mode copy</code></div></div>
     </div>
   </div>
 </section>
 
 <section id="rapport">
-  <div class="wrap report">
-    <a class="shot" href="exemples/rapport-fr.html"><img src="img/report-fr.png" alt="Rapport de qualité d'un vol" loading="lazy"></a>
-    <div>
-      <p class="kicker">Le rapport de qualité</p>
-      <h2>Comprendre un vol en dix secondes</h2>
-      <p class="sub">Chaque vol reçoit un rapport HTML, en français ou en anglais, et sa version JSON pour les scripts.</p>
-      <ul>
-        <li>Un bandeau qui dit si tout va bien, ou quoi vérifier</li>
-        <li>La carte des caméras, colorée par statut de la solution</li>
-        <li>L'incertitude de chaque capture au fil du vol</li>
-        <li>La base : distance, couverture, cadre de référence</li>
-      </ul>
-      <div class="btns">
-        <a class="btn primary" href="exemples/rapport-fr.html">Ouvrir l'exemple</a>
-        <a class="btn ghost" href="exemples/report-en.html" hreflang="en">English version</a>
-      </div>
-    </div>
-  </div>
+  <p class="label"><b>02</b>Rapport de qualité</p>
+  <h2>Un vol, une page.</h2>
+  <p class="lede">Statut, carte des caméras, incertitude de chaque capture, base et cadre de référence. HTML en français ou en anglais, et JSON pour les scripts.</p>
+  <figure>
+    <a href="exemples/rapport-fr.html"><img src="img/report-fr.png" alt="Rapport de qualité d'un vol" loading="lazy"></a>
+    <figcaption><span>Vol synthétique, 96 captures</span><span><a href="exemples/rapport-fr.html">Ouvrir</a> · <a href="exemples/report-en.html">English</a></span></figcaption>
+  </figure>
 </section>
 
 <section>
-  <div class="wrap">
-    <p class="kicker">Fonctions</p>
-    <h2>Tout ce qu'il faut entre le drone et l'orthomosaïque</h2>
-    <p class="sub">Azimut remplace l'étape de géoréférencement ; la photogrammétrie reste dans vos logiciels habituels.</p>
-    <div class="features">
-      <div class="card feature"><div class="ico">🔎</div><h3>Diagnostic d'abord</h3><p>Des cartes SD entières en secondes, à partir des seuls en-têtes d'images.</p></div>
-      <div class="card feature"><div class="ico">🛰️</div><h3>PPK</h3><p>RTKLIB-EX contre votre base ; chaque fichier positionné à sa propre heure d'exposition.</p></div>
-      <div class="card feature"><div class="ico">🌈</div><h3>Mavic 3M</h3><p>Cinq fichiers par capture ; les bandes, exposées 26 ms après le RVB, ont leur position.</p></div>
-      <div class="card feature"><div class="ico">📍</div><h3>CSRS-PPP et RTK</h3><p>Base positionnée par CSRS-PPP (RNCan) ; vols RTK corrigés du décalage de la base.</p></div>
-      <div class="card feature"><div class="ico">📏</div><h3>Hauteurs CGVD2013</h3><p>Ou ellipsoïdales, avec vérification que le géoïde correspond au cadre.</p></div>
-      <div class="card feature"><div class="ico">📤</div><h3>Sorties</h3><p>PIX4Dmatic, Metashape, OpenDroneMap, CSV, rapport HTML et JSON.</p></div>
-      <div class="card feature"><div class="ico">🖼️</div><h3>Dans les images</h3><p>EXIF et XMP DJI, sur place (annulable) ou dans des copies, radiométrie intacte.</p></div>
-      <div class="card feature"><div class="ico">🤖</div><h3>Agents</h3><p>Claude ou Codex mènent le traitement et vous consultent à chaque décision.</p></div>
-    </div>
-  </div>
+  <p class="label"><b>03</b>Fonctions</p>
+  <h2>Entre le drone et l'orthomosaïque.</h2>
+  <p class="lede">Azimut remplace l'étape de géoréférencement. La photogrammétrie reste dans vos logiciels.</p>
+  <dl>
+    <div><dt>Diagnostic</dt><dd>Cartes SD entières en secondes, par les seuls en-têtes.</dd></div>
+    <div><dt>PPK</dt><dd>RTKLIB-EX ; chaque fichier à sa propre heure d'exposition.</dd></div>
+    <div><dt>Mavic 3M</dt><dd>Bandes exposées 26 ms après le RVB, positionnées à part.</dd></div>
+    <div><dt>CSRS-PPP et RTK</dt><dd>Base par CSRS-PPP ; vols RTK corrigés du décalage.</dd></div>
+    <div><dt>Hauteurs</dt><dd>CGVD2013 ou ellipsoïdales, géoïde vérifié contre le cadre.</dd></div>
+    <div><dt>Sorties</dt><dd>PIX4Dmatic, Metashape, OpenDroneMap, CSV, HTML, JSON.</dd></div>
+    <div><dt>Images</dt><dd>EXIF et XMP DJI, sur place (annulable) ou en copie.</dd></div>
+    <div><dt>Agents</dt><dd>Claude ou Codex, avec une question à chaque décision.</dd></div>
+  </dl>
 </section>
 
 <section id="validation">
-  <div class="wrap">
-    <p class="kicker">Validation</p>
-    <h2>Testé sur un vrai vol</h2>
-    <p class="sub">Un vol Mavic 3M complet traité contre la station IGS KUJ2 (Kuujjuarapik, 7,6 km). Détails et limites : <a href="https://github.com/tofunori/azimut/blob/main/docs/validation.md">docs/validation.md</a>.</p>
-    <div class="card checks">
-      <div class="check"><span class="mark">✓</span><span class="what">PPK d'un vol complet, 450 captures, 2 248 fichiers</span><span class="res"><b>450 / 450 fixées</b> · 0,4 cm H · 0,5 cm V</span></div>
-      <div class="check"><span class="mark">✓</span><span class="what">Hauteurs CGVD2013 comparées à PROJ</span><span class="res">écart <b>&lt; 0,05 mm</b></span></div>
-      <div class="check"><span class="mark">✓</span><span class="what">Écriture dans les images, puis annulation</span><span class="res">seuls les octets de position changent ; <b>fichiers identiques</b> après annulation</span></div>
-      <div class="check todo"><span class="mark">…</span><span class="what">Précision absolue</span><span class="res">points de contrôle au sol et comparaison avec un autre logiciel à venir</span></div>
-    </div>
+  <p class="label"><b>04</b>Validation</p>
+  <h2>Testé sur un vrai vol.</h2>
+  <p class="lede">Mavic 3M, 450 captures, contre la station IGS KUJ2 à 7,6 km. <a href="https://github.com/tofunori/azimut/blob/main/docs/validation.md">Détails et limites</a>.</p>
+  <table>
+    <thead><tr><th>Test</th><th style="text-align:right">Résultat</th></tr></thead>
+    <tbody>
+      <tr><td><span class="st"></span>PPK, vol complet, 2 248 fichiers</td><td>450/450 fixées · 0,4 cm H · 0,5 cm V</td></tr>
+      <tr><td><span class="st"></span>Hauteurs CGVD2013 contre PROJ</td><td>&lt; 0,05 mm</td></tr>
+      <tr><td><span class="st"></span>Écriture dans les images, puis annulation</td><td>fichiers identiques</td></tr>
+      <tr class="todo"><td><span class="st"></span>Précision absolue, points de contrôle</td><td>à venir</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <p class="label"><b>05</b>Agents</p>
+  <h2>Il demande au lieu de deviner.</h2>
+  <p class="lede">Avec <span class="mono">azimut mcp</span>, Claude Code ou Codex mènent le traitement et vous consultent pour la base, le cadre, l'écriture des images.</p>
+  <div class="cmd"><code>claude mcp add azimut -- azimut mcp</code></div>
+  <div class="transcript">
+    <p><span class="who">vous</span>PPK du vol dans terrain/2026-08-09, base dans base/.</p>
+    <p class="bot"><span class="who">agent</span>450 captures, base couvrant le vol. CSRS-PPP donne NAD83(CSRS) v8. J'utilise ces coordonnées ?</p>
+    <p><span class="who">vous</span>Oui.</p>
+    <p class="bot"><span class="who">agent</span>450/450 fixées, 0,4 cm. Écrire dans des copies ou dans les originaux ?</p>
   </div>
 </section>
 
 <section>
-  <div class="wrap agent">
-    <div>
-      <p class="kicker">Avec un agent</p>
-      <h2>Demandez, il pose les bonnes questions</h2>
-      <p class="sub">Avec <code>azimut mcp</code>, Claude Code ou Codex lancent le diagnostic, le PPK et l'écriture des images. À chaque choix qui vous revient (quelle base, quel cadre, écraser ou copier), l'agent vous demande au lieu de deviner.</p>
-      <div class="cmd"><pre><code>claude mcp add azimut -- azimut mcp</code></pre><button type="button" hidden>Copier</button></div>
-    </div>
-    <div class="card chat" aria-label="Exemple de conversation">
-      <div class="bubble user">Fais le PPK du vol dans terrain/2026-08-09 avec la base dans base/, rapport en français.</div>
-      <div class="bubble bot">Diagnostic : 450 captures, base couvrant tout le vol. Le rapport CSRS-PPP donne <b>NAD83(CSRS) v8</b>. J'utilise ces coordonnées pour la base ?</div>
-      <div class="bubble user">Oui.</div>
-      <div class="bubble bot"><b>450 / 450 fixées</b>, incertitude médiane 0,4 cm. Voulez-vous écrire les positions dans des copies des images ou dans les originaux ?</div>
-    </div>
-  </div>
-</section>
-
-<section id="docs">
-  <div class="wrap">
-    <p class="kicker">Documentation</p>
-    <h2>Pour aller plus loin</h2>
-    <p class="sub">La documentation détaillée est en anglais ; le guide du labo est en français.</p>
-    <div class="docs">
-      <a class="card" href="https://github.com/tofunori/azimut/blob/main/docs/guide-labo.md"><b>Guide du labo</b><span>Traiter un vol en 5 minutes</span></a>
-      <a class="card" href="https://github.com/tofunori/azimut/blob/main/docs/install.md"><b>Installation</b><span>Scripts, archives, depuis le code source</span></a>
-      <a class="card" href="https://github.com/tofunori/azimut/blob/main/docs/ppk.md"><b>PPK et CSRS-PPP</b><span>Base, options, cadres de référence</span></a>
-      <a class="card" href="https://github.com/tofunori/azimut/blob/main/docs/pix4dmatic.md"><b>PIX4Dmatic</b><span>Importer les positions</span></a>
-      <a class="card" href="https://github.com/tofunori/azimut/blob/main/docs/heights.md"><b>Hauteurs CGVD2013</b><span>Grilles du géoïde et cadres</span></a>
-      <a class="card" href="https://github.com/tofunori/azimut/tree/main/examples"><b>Exemples de sorties</b><span>Rapports, CSV, fichiers d'import</span></a>
-    </div>
+  <p class="label"><b>06</b>Documentation</p>
+  <div class="links">
+    <a href="https://github.com/tofunori/azimut/blob/main/docs/guide-labo.md">Guide du labo <span>→</span></a>
+    <a href="https://github.com/tofunori/azimut/blob/main/docs/install.md">Installation <span>→</span></a>
+    <a href="https://github.com/tofunori/azimut/blob/main/docs/ppk.md">PPK et CSRS-PPP <span>→</span></a>
+    <a href="https://github.com/tofunori/azimut/blob/main/docs/pix4dmatic.md">PIX4Dmatic <span>→</span></a>
+    <a href="https://github.com/tofunori/azimut/blob/main/docs/heights.md">Hauteurs CGVD2013 <span>→</span></a>
+    <a href="https://github.com/tofunori/azimut/tree/main/examples">Exemples de sorties <span>→</span></a>
   </div>
 </section>
 
@@ -232,12 +144,11 @@
 
 <footer>
   <div class="wrap">
-    <a class="brand" href="./"><img src="img/logo.svg" alt="" width="24" height="24">Azimut</a>
-    <span>GlacioLab, Université du Québec à Trois-Rivières · Licence BSD 2-Clause</span>
-    <span class="right"><a href="https://github.com/tofunori/azimut">GitHub</a> · <a href="https://github.com/tofunori/azimut/blob/main/CITATION.cff">Citer</a> · <a href="https://github.com/rtklibexplorer/RTKLIB">RTKLIB-EX</a> · <a href="en/" hreflang="en">English</a></span>
+    <span>Azimut · GlacioLab, UQTR</span>
+    <span>BSD 2-Clause</span>
+    <span class="right"><a href="https://github.com/tofunori/azimut/blob/main/CITATION.cff">Citer</a> · <a href="https://github.com/rtklibexplorer/RTKLIB">RTKLIB-EX</a></span>
   </div>
 </footer>
 
-<script src="copy.js" defer></script>
 </body>
 </html>
