@@ -59,8 +59,9 @@ enum Command {
         /// Base antenna height above the mark (m). Default: from the RINEX header.
         #[arg(long)]
         antenna_height: Option<f64>,
-        /// IGS base antenna type with radome (needs --antex to have an effect).
-        #[arg(long)]
+        /// IGS base antenna type with radome (needs --antex to have an effect). Requires
+        /// --antenna-height: without both, type and height come from the RINEX header.
+        #[arg(long, requires = "antenna_height")]
         antenna_type: Option<String>,
         /// CSRS-PPP summary (.sum) of the base RINEX: base position, antenna handling and
         /// frame are taken from it. The RINEX given with --base must be the one submitted.
