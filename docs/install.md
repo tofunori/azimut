@@ -1,13 +1,31 @@
 # Installation
 
 Azimut is one command-line program, `azimut`, for Linux, macOS and Windows. PPK also needs
-the two console programs of RTKLIB-EX, which Azimut drives but does not ship.
+two console programs of RTKLIB-EX; the release archives and install scripts include them.
 
 ## 1. Azimut
 
-**Prebuilt binaries.** Each [release](https://github.com/tofunori/azimut/releases) carries
-`azimut` for Linux (x86-64), macOS (Apple silicon and Intel) and Windows (x86-64). Unpack it
-and put it on the `PATH`.
+**One line** (installs the latest release, RTKLIB-EX included):
+
+```powershell
+# Windows, in PowerShell
+irm https://raw.githubusercontent.com/tofunori/azimut/main/scripts/install.ps1 | iex
+```
+
+```sh
+# macOS or Linux, in a terminal
+curl -fsSL https://raw.githubusercontent.com/tofunori/azimut/main/scripts/install.sh | sh
+```
+
+The scripts install into `%LOCALAPPDATA%\azimut` (Windows, added to the user `PATH`) or
+`~/.local/share/azimut` with a link in `~/.local/bin` (macOS, Linux).
+
+**Archives.** Each [release](https://github.com/tofunori/azimut/releases) has an archive per
+system: Linux x86-64, macOS (Apple silicon and Intel), Windows x86-64. Each holds `azimut`
+and an `rtklib` folder with `convbin` and `rnx2rtkp`; Azimut finds them there by itself.
+The programs are not signed: on Windows, SmartScreen may ask to confirm ("More info" → "Run
+anyway"); on macOS, an archive downloaded with a browser may need
+`xattr -dr com.apple.quarantine <folder>`.
 
 **From source.** With [Rust](https://rustup.rs) 1.82 or newer:
 
@@ -28,22 +46,18 @@ azimut shift demo --enu 0.42,-0.18,0.65 --frame "NAD83(CSRS) v8, epoch 2010.0" -
 
 `demo/out/DJI_Demo_report.html` is the quality report of this synthetic flight.
 
-## 2. RTKLIB-EX (for PPK)
+## 2. RTKLIB-EX (only when building from source)
 
-Azimut uses `convbin` (raw log to RINEX) and `rnx2rtkp` (PPK) from
-[RTKLIB-EX](https://github.com/rtklibexplorer/RTKLIB) (BSD-2).
+The release archives include RTKLIB-EX. From source, build its two console programs with the
+same options as the archives:
 
-- **Windows**: download a release of RTKLIB-EX and keep its `bin` folder.
-- **Linux, macOS**: build the two programs:
+```sh
+git clone https://github.com/rtklibexplorer/RTKLIB
+scripts/build-rtklib.sh RTKLIB rtklib-bin      # convbin and rnx2rtkp, no LAPACK needed
+```
 
-  ```sh
-  git clone https://github.com/rtklibexplorer/RTKLIB
-  make -C RTKLIB/app/consapp/convbin/gcc
-  make -C RTKLIB/app/consapp/rnx2rtkp/gcc LDLIBS=-lm   # without LAPACK, libgfortran is not needed
-  ```
-
-Then either give the folder to each run (`--rtklib /path/to/bin`), set
-`AZIMUT_RTKLIB_DIR`, or put both programs on the `PATH`.
+Then give the folder to each run (`--rtklib rtklib-bin`), set `AZIMUT_RTKLIB_DIR`, put the
+programs in an `rtklib` folder next to `azimut`, or add them to the `PATH`.
 
 ## 3. Reference files (optional)
 

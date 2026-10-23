@@ -1,14 +1,22 @@
 name: Release
 
-# Builds `azimut` for Linux, macOS and Windows. A tag `v*` publishes a GitHub release with
-# the archives; a manual run only keeps them as workflow artifacts.
+# Builds ready-to-run archives: `azimut` with the RTKLIB-EX programs it drives (convbin,
+# rnx2rtkp) in an `rtklib` folder, for Linux, macOS and Windows. A tag `v*` publishes them as
+# a GitHub release; pull requests that touch the packaging and manual runs only build them.
 on:
   push:
     tags: ["v*"]
+  pull_request:
+    paths: [".github/workflows/release.yml", "scripts/**"]
   workflow_dispatch:
 
 permissions:
   contents: write
+
+env:
+  # RTKLIB-EX commit built into the archives (BSD-2; its licence ships with them).
+  RTKLIB_REPO: https://github.com/rtklibexplorer/RTKLIB
+  RTKLIB_COMMIT: 50886e2
 
 jobs:
   build:
@@ -28,17 +36,47 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - run: cargo build --release --locked -p azimut-cli --target ${{ matrix.target }}
+
+      - name: Fetch RTKLIB-EX
+        shell: bash
+        run: |
+          git clone --filter=blob:none "$RTKLIB_REPO" rtklib-src
+          git -C rtklib-src checkout "$RTKLIB_COMMIT"
+      - name: Build RTKLIB-EX (Linux)
+        if: runner.os == 'Linux'
+        run: scripts/build-rtklib.sh rtklib-src rtklib-bin
+      - name: Build RTKLIB-EX (macOS)
+        if: runner.os == 'macOS'
+        env:
+          EXTRA_CFLAGS: ${{ startsWith(matrix.target, 'x86_64') && '-arch x86_64' || '-arch arm64' }}
+        run: scripts/build-rtklib.sh rtklib-src rtklib-bin
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc
+      - name: Build RTKLIB-EX (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: CC=gcc scripts/build-rtklib.sh rtklib-src rtklib-bin
+
       - name: Package
         shell: bash
         run: |
-          name="azimut-${GITHUB_REF_NAME//\//-}-${{ matrix.target }}"
-          mkdir "$name"
-          cp README.md README.fr.md LICENSE "$name"/
+          name="azimut-${{ matrix.target }}"
+          mkdir -p "$name/rtklib"
+          cp README.md README.fr.md LICENSE docs/guide-labo.md "$name"/
+          cp rtklib-bin/* "$name/rtklib/"
           if [ "${{ matrix.archive }}" = zip ]; then
             cp "target/${{ matrix.target }}/release/azimut.exe" "$name"/
+            "$name/azimut.exe" --version
             7z a "$name.zip" "$name" > /dev/null
           else
             cp "target/${{ matrix.target }}/release/azimut" "$name"/
+            if [ "${{ matrix.target }}" != x86_64-apple-darwin ]; then
+              "$name/azimut" --version
+              "$name/rtklib/rnx2rtkp" -? 2>&1 | head -1 || true
+            fi
             tar czf "$name.tar.gz" "$name"
           fi
           echo "ASSET=$name.${{ matrix.archive }}" >> "$GITHUB_ENV"
