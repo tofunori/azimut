@@ -9,9 +9,12 @@
 //! Each file gets its own position and time: Mavic 3M bands are exposed after the RGB JPEG
 //! that the MRK times, so their row differs from the JPEG's.
 //! - [`odm_geo_txt`]: OpenDroneMap `geo.txt` (EPSG:4326, ellipsoidal heights).
+//! - [`pix4dmatic_csv`]: PIX4Dmatic image geolocation file (positions and accuracies, no
+//!   angles, so PIX4Dmatic keeps the orientation read from the images).
 //! - [`problems_csv`]: exposures without a camera centre or without an uncertainty, and why.
 //! - [`images`]: positions written into the images themselves (EXIF GPS and DJI XMP), in
 //!   place and only on request, with the original bytes kept for undoing.
+//! - [`report`]: quality report of a flight, as JSON and as a self-contained HTML page.
 //!
 //! An uncertainty that RTKLIB could not give (covariance not positive definite) is left
 //! empty, never written as 0 m: photogrammetry software would read 0 as a perfect position.
@@ -19,6 +22,7 @@
 use std::fmt::Write as _;
 
 pub mod images;
+pub mod report;
 
 use azimut_geo::GeoidGrid;
 use azimut_io::mrk::SECONDS_PER_WEEK;
@@ -146,6 +150,57 @@ pub fn odm_geo_txt(sol: &FlightSolution, filter: &RowFilter) -> String {
         }
     }
     s
+}
+
+/// PIX4Dmatic image geolocation file, in its documented "geographic coordinates with
+/// accuracy values" layout: no header (one `#` comment line), then
+/// `image,latitude,longitude,z,accuracy horizontal,accuracy vertical`, latitude first as in
+/// geographic EPSG definitions. Accuracies are 1-sigma: horizontal radial
+/// sqrt(sE² + sN²), vertical sU. `z` is the ellipsoidal height, or the orthometric height
+/// with a geoid grid. Files without an uncertainty (or outside the grid) get no row, so that
+/// PIX4Dmatic keeps the values read from the image. Returns the text and the number of
+/// files left out.
+pub fn pix4dmatic_csv(
+    sol: &FlightSolution,
+    filter: &RowFilter,
+    geoid: Option<&GeoidGrid>,
+) -> (String, usize) {
+    let height = match geoid {
+        Some(g) => format!("orthometric height {} (m)", g.vertical_datum()),
+        None => "ellipsoidal height (m)".into(),
+    };
+    let mut s = format!(
+        "#image,latitude,longitude,{height},accuracy horizontal (m),accuracy vertical (m); frame: {}\n",
+        sol.frame.replace('\n', " ")
+    );
+    let mut left_out = 0;
+    for f in sol
+        .exposures
+        .iter()
+        .flat_map(|e| &e.files)
+        .filter(|f| filter.keep(&f.role))
+    {
+        let Some(c) = f.camera else { continue };
+        let z = match geoid {
+            Some(g) => g.orthometric_height(c.lat_deg, c.lon_deg, c.h_m),
+            None => Some(c.h_m),
+        };
+        let (Some([se, sn, su]), Some(z)) = (c.sigma_enu_m, z) else {
+            left_out += 1;
+            continue;
+        };
+        let _ = writeln!(
+            s,
+            "{},{:.10},{:.10},{:.4},{:.4},{:.4}",
+            f.file_name,
+            c.lat_deg,
+            c.lon_deg,
+            z,
+            (se * se + sn * sn).sqrt(),
+            su
+        );
+    }
+    (s, left_out)
 }
 
 /// Exposures without a camera centre, or with one but no uncertainty.
@@ -301,6 +356,48 @@ mod tests {
             .next()
             .unwrap()
             .ends_with(",frame"));
+    }
+
+    #[test]
+    fn pix4dmatic_rows_follow_the_documented_layout() {
+        let mut sol = sample();
+        let (csv, left_out) = pix4dmatic_csv(&sol, &RowFilter::All, None);
+        let lines: Vec<&str> = csv.lines().collect();
+        assert!(lines[0].starts_with('#'), "single comment line, no header");
+        assert!(lines[0].contains("NAD83(CSRS) v8, epoch 2010.0"));
+        assert_eq!(
+            lines[1], "A_D.JPG,46.3500000000,-72.5500000000,119.8200,0.0163,0.0250",
+            "image, latitude, longitude, z, 1-sigma horizontal radial, vertical"
+        );
+        assert_eq!(lines.len(), 3, "the exposure without a position has no row");
+        assert_eq!(left_out, 0);
+
+        // No uncertainty: no row, so PIX4Dmatic keeps the image's own values.
+        sol.exposures[0].files[1].camera.as_mut().unwrap().sigma_enu_m = None;
+        let (csv, left_out) = pix4dmatic_csv(&sol, &RowFilter::All, None);
+        assert_eq!(csv.lines().count(), 2);
+        assert_eq!(left_out, 1);
+    }
+
+    #[test]
+    fn report_lists_points_to_check() {
+        use crate::report::FlightReport;
+        let sol = sample();
+        let r = FlightReport::build(&sol, None, None, None);
+        assert_eq!(r.summary.exposures, sol.stats.exposures);
+        assert_eq!(r.summary.files, 3);
+        assert_eq!(r.summary.files_positioned, 2);
+        assert_eq!(r.exposures.len(), 2);
+        assert_eq!(r.exposures[0].quality.as_deref(), Some("fixed"));
+        assert_eq!(r.summary.sigma_median_enu_m, Some([0.012, 0.011, 0.025]));
+        let html = r.html();
+        assert!(html.starts_with("<!doctype html>"));
+        assert!(html.contains("exposure outside the PPK trajectory"));
+        assert!(html.contains("<circle class=\"fixed\""));
+        assert!(!html.contains("<script"), "self-contained, no scripts");
+        let json = serde_json::to_string(&r).unwrap();
+        let back: FlightReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.exposures.len(), 2);
     }
 
     #[test]
