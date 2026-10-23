@@ -169,7 +169,11 @@ pub fn parse_str(text: &str) -> Result<PppSummary, String> {
                     _ => return Err(bad("ARP offsets")),
                 });
             }
-            "IAR" => sum.fixed_ambiguities_pct = rest.trim_end_matches('%').trim().parse().ok(),
+            // Version 4: `IAR 98.71%`. Version 5.15: one line per constellation, then `IAR ALL 89.30%`.
+            "IAR" => match t.as_slice() {
+                [pct] | ["ALL", pct] => sum.fixed_ambiguities_pct = pct.trim_end_matches('%').parse().ok(),
+                _ => {}
+            },
             "GHT" => sum.geoid_m = t.first().and_then(|v| v.parse().ok()),
             "OHT" if t.len() >= 3 && t[0] != "SYST" => {
                 let h = t[2].parse().map_err(|_| bad("orthometric height"))?;
@@ -292,6 +296,16 @@ GHT -29.7081
         assert_eq!(p.sigma95_m, [0.0052, 0.0043, 0.0195]);
         // 2024 is a leap year: day 153 at 64110 s.
         assert!((p.epoch_year.unwrap() - (2024.0 + (152.0 + 64110.0 / 86400.0) / 366.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn reads_per_constellation_ambiguity_lines() {
+        // Version 5.15 writes one IAR line per constellation, then the total.
+        let v5 = SAMPLE.replace(
+            "IAR 98.71%\n",
+            "IAR GAL OFF\nIAR GPS 89.30%\nIAR GLO OFF\nIAR ALL 89.30%\n",
+        );
+        assert_eq!(parse_str(&v5).unwrap().fixed_ambiguities_pct, Some(89.3));
     }
 
     #[test]
