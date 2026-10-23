@@ -1,12 +1,13 @@
 name: Pages
 
-# Publishes the example quality reports so they can be opened in a browser. Needs GitHub
-# Pages enabled with "GitHub Actions" as source (Settings > Pages); until then the job is
-# allowed to fail without turning the commit red.
+# Publishes the project site (site/, French at / and English at /en/) with the example
+# quality reports under /exemples/. Needs GitHub Pages enabled with "GitHub Actions" as
+# source (Settings > Pages); until then the job is allowed to fail without turning the
+# commit red.
 on:
   push:
     branches: [main]
-    paths: ["examples/**", "docs/img/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "examples/**", "docs/img/**", "scripts/build-site.sh", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -28,24 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build the site
-        run: |
-          mkdir -p _site/img
-          cp examples/demo-flight/*.html _site/
-          cp docs/img/banner.svg docs/img/logo.svg _site/img/
-          cat > _site/index.html <<'HTML'
-          <!doctype html><html lang="en"><head><meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>Azimut: example reports</title><link rel="icon" href="img/logo.svg">
-          <style>body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:#0b2236;color:#fff}
-          main{max-width:900px;margin:0 auto;padding:24px 16px}img{width:100%;border-radius:12px}
-          a.card{display:block;margin:16px 0;padding:18px 20px;border-radius:12px;background:rgba(255,255,255,.08);color:#fff;text-decoration:none}
-          a.card:hover{background:rgba(255,255,255,.14)}small{opacity:.7}</style></head>
-          <body><main><img src="img/banner.svg" alt="Azimut">
-          <a class="card" href="rapport-fr.html"><b>Rapport de qualité (français)</b><br><small>Vol synthétique, 96 captures</small></a>
-          <a class="card" href="report-en.html"><b>Quality report (English)</b><br><small>Synthetic flight, 96 captures</small></a>
-          <p><small><a style="color:#9ecbff" href="https://github.com/tofunori/azimut">github.com/tofunori/azimut</a></small></p>
-          </main></body></html>
-          HTML
+        run: scripts/build-site.sh _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
       - id: deploy

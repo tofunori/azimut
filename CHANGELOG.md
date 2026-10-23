@@ -5,6 +5,12 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 ## [Unreleased]
 
 ### Added
+- Project website on GitHub Pages (French and English), with the example quality reports
+  viewable online (`site/`, `scripts/build-site.sh`).
+
+## [0.1.0] - 2026-10-23
+
+### Added
 - Header-only diagnosis of DJI flight folders (`scan`): Mavic 3M capture grouping, MRK and
   photo pairing on time, base-station coverage, interval and distance.
 - PPK with RTKLIB-EX (`process`): combined solution with full covariance, antenna
