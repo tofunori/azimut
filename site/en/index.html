@@ -53,7 +53,7 @@
 <section id="use">
   <p class="label"><b>01</b>Use</p>
   <h2>Three commands per flight.</h2>
-  <p class="lede">The copy of the SD card, the base station's RINEX and, ideally, the CSRS-PPP report for that base. RTKLIB-EX is included.</p>
+  <p class="lede">The copy of the SD card and the base station's RINEX. Azimut submits the base to NRCan CSRS-PPP itself; RTKLIB-EX is included.</p>
   <div class="rows">
     <div class="row">
       <div><span class="num">a</span>Check</div>
@@ -62,8 +62,8 @@
     </div>
     <div class="row">
       <div><span class="num">b</span>Compute</div>
-      <div><p>PPK against the base, CGVD2013 heights, quality report.</p>
-        <div class="cmd block"><code>azimut process flights/ --base base.24o --base-ppp base.sum \
+      <div><p>Base position from CSRS-PPP, then PPK, CGVD2013 heights and the quality report.</p>
+        <div class="cmd block"><code>azimut process flights/ --base base.24o --submit-ppp --email you@example.org \
   --geoid ca_nrc_CGG2013an83.tif --out results</code></div></div>
     </div>
     <div class="row">
@@ -92,7 +92,7 @@
     <div><dt>Diagnosis</dt><dd>Whole SD cards in seconds, from image headers only.</dd></div>
     <div><dt>PPK</dt><dd>RTKLIB-EX; each file at its own exposure time.</dd></div>
     <div><dt>Mavic 3M</dt><dd>Bands exposed 26 ms after the RGB image, positioned on their own.</dd></div>
-    <div><dt>CSRS-PPP &amp; RTK</dt><dd>Base from CSRS-PPP; RTK flights corrected by the shift.</dd></div>
+    <div><dt>CSRS-PPP &amp; RTK</dt><dd>Base submitted to CSRS-PPP by <span class="mono">azimut ppp</span>; RTK flights corrected by the shift.</dd></div>
     <div><dt>Heights</dt><dd>CGVD2013 or ellipsoidal, geoid checked against the frame.</dd></div>
     <div><dt>Outputs</dt><dd>PIX4Dmatic, Metashape, OpenDroneMap, CSV, HTML, JSON.</dd></div>
     <div><dt>Images</dt><dd>EXIF and DJI XMP, in place (undoable) or in copies.</dd></div>

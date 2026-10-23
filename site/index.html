@@ -53,7 +53,7 @@
 <section id="installer">
   <p class="label"><b>01</b>Utiliser</p>
   <h2>Trois commandes par vol.</h2>
-  <p class="lede">La copie de la carte SD, le RINEX de la base et, idéalement, le rapport CSRS-PPP de cette base. RTKLIB-EX est inclus.</p>
+  <p class="lede">La copie de la carte SD et le RINEX de la base. Azimut soumet lui-même la base à CSRS-PPP (RNCan) ; RTKLIB-EX est inclus.</p>
   <div class="rows">
     <div class="row">
       <div><span class="num">a</span>Diagnostiquer</div>
@@ -62,8 +62,8 @@
     </div>
     <div class="row">
       <div><span class="num">b</span>Calculer</div>
-      <div><p>PPK contre la base, hauteurs CGVD2013, rapport en français.</p>
-        <div class="cmd block"><code>azimut process vols/ --base base.24o --base-ppp base.sum \
+      <div><p>Position de la base par CSRS-PPP, puis PPK, hauteurs CGVD2013 et rapport en français.</p>
+        <div class="cmd block"><code>azimut process vols/ --base base.24o --submit-ppp --email vous@exemple.ca \
   --geoid ca_nrc_CGG2013an83.tif --report-lang fr --out resultats</code></div></div>
     </div>
     <div class="row">
@@ -92,7 +92,7 @@
     <div><dt>Diagnostic</dt><dd>Cartes SD entières en secondes, par les seuls en-têtes.</dd></div>
     <div><dt>PPK</dt><dd>RTKLIB-EX ; chaque fichier à sa propre heure d'exposition.</dd></div>
     <div><dt>Mavic 3M</dt><dd>Bandes exposées 26 ms après le RVB, positionnées à part.</dd></div>
-    <div><dt>CSRS-PPP et RTK</dt><dd>Base par CSRS-PPP ; vols RTK corrigés du décalage.</dd></div>
+    <div><dt>CSRS-PPP et RTK</dt><dd>Base soumise à CSRS-PPP par <span class="mono">azimut ppp</span> ; vols RTK corrigés du décalage.</dd></div>
     <div><dt>Hauteurs</dt><dd>CGVD2013 ou ellipsoïdales, géoïde vérifié contre le cadre.</dd></div>
     <div><dt>Sorties</dt><dd>PIX4Dmatic, Metashape, OpenDroneMap, CSV, HTML, JSON.</dd></div>
     <div><dt>Images</dt><dd>EXIF et XMP DJI, sur place (annulable) ou en copie.</dd></div>
