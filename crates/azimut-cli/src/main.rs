@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 
 use azimut_export::images::{self, FileEdit};
-use azimut_export::report::{FlightReport, ImagesInfo};
+use azimut_export::report::{FlightReport, ImagesInfo, Lang};
 use azimut_export::{odm_geo_txt, pix4dmatic_csv, positions_csv_with_heights, problems_csv, RowFilter};
 use azimut_geo::GeoidGrid;
 use azimut_io::csrs_ppp::{self, PppPoint, PppSummary};
@@ -101,6 +101,9 @@ enum Command {
         geoid: Option<PathBuf>,
         #[command(flatten)]
         images: ImageArgs,
+        /// Language of the HTML quality report.
+        #[arg(long, value_enum, default_value = "en")]
+        report_lang: ReportLang,
         /// Largest trajectory gap around an exposure, seconds.
         #[arg(long, default_value_t = 1.0)]
         max_gap: f64,
@@ -155,6 +158,9 @@ enum Command {
         geoid: Option<PathBuf>,
         #[command(flatten)]
         images: ImageArgs,
+        /// Language of the HTML quality report.
+        #[arg(long, value_enum, default_value = "en")]
+        report_lang: ReportLang,
         /// Pairing tolerance between MRK and image times, seconds.
         #[arg(long, default_value_t = DEFAULT_TOLERANCE_S)]
         tolerance: f64,
@@ -254,6 +260,7 @@ fn main() -> Result<()> {
             roles,
             geoid,
             images,
+            report_lang,
             max_gap,
             tolerance,
         } => {
@@ -333,6 +340,7 @@ fn main() -> Result<()> {
                 filter: row_filter(roles),
                 geoid: open_geoid(geoid.as_deref(), &opts.base.frame)?,
                 images,
+                lang: report_lang.into(),
             };
             std::fs::create_dir_all(&out).with_context(|| format!("creating {}", out.display()))?;
 
@@ -382,6 +390,7 @@ fn main() -> Result<()> {
             roles,
             geoid,
             images,
+            report_lang,
             tolerance,
         } => {
             anyhow::ensure!(dir.is_dir(), "{} is not a folder", dir.display());
@@ -451,6 +460,7 @@ fn main() -> Result<()> {
                 filter: row_filter(roles),
                 geoid: open_geoid(geoid.as_deref(), &frame)?,
                 images,
+                lang: report_lang.into(),
             };
             std::fs::create_dir_all(&out).with_context(|| format!("creating {}", out.display()))?;
             let mut failures = 0;
@@ -685,11 +695,28 @@ struct ImageArgs {
     dry_run: bool,
 }
 
+/// Language of the HTML report.
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum ReportLang {
+    En,
+    Fr,
+}
+
+impl From<ReportLang> for Lang {
+    fn from(l: ReportLang) -> Lang {
+        match l {
+            ReportLang::En => Lang::En,
+            ReportLang::Fr => Lang::Fr,
+        }
+    }
+}
+
 /// What to write besides the position files.
 struct Outputs {
     filter: RowFilter,
     geoid: Option<GeoidGrid>,
     images: ImageArgs,
+    lang: Lang,
 }
 
 /// Open the geoid grid and check that it applies to the frame of the positions.
@@ -740,7 +767,7 @@ fn finish_flight(
     written.push(html.clone());
     rep.outputs = written;
     std::fs::write(&json, serde_json::to_string_pretty(&rep)?)?;
-    std::fs::write(&html, rep.html())?;
+    std::fs::write(&html, rep.html_in(outputs.lang))?;
     println!(
         "   written: {} (and {} more files)",
         rep.outputs[0].display(),
@@ -748,7 +775,7 @@ fn finish_flight(
     );
     println!("   report: {}", html.display());
     for a in &rep.attention {
-        println!("   to check: {a}");
+        println!("   to check: {}", a.text);
     }
     Ok(problem)
 }
