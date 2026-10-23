@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 
-use azimut_export::{odm_geo_txt, positions_csv, problems_csv, RowFilter};
+use azimut_export::images::{self, FileEdit};
+use azimut_export::{odm_geo_txt, positions_csv_with_heights, problems_csv, RowFilter};
+use azimut_geo::GeoidGrid;
 use azimut_io::csrs_ppp::{self, PppPoint, PppSummary};
 use azimut_io::matching::DEFAULT_TOLERANCE_S;
 use azimut_io::rinex::is_nav_name;
@@ -89,6 +91,15 @@ enum Command {
         /// Only write rows for these file roles: jpeg, Green, Red, RedEdge, NIR, tiff.
         #[arg(long, value_delimiter = ',')]
         roles: Vec<String>,
+        /// Geoid grid in the PROJ GeoTIFF format, for orthometric heights in the CSV, e.g.
+        /// ca_nrc_CGG2013an83.tif (CGVD2013, for NAD83(CSRS) positions) from cdn.proj.org. It
+        /// must apply to the frame of the positions (--frame).
+        #[arg(long, value_name = "GRID.tif")]
+        geoid: Option<PathBuf>,
+        /// Also write the positions into the images (EXIF GPS and DJI XMP), in place. The
+        /// original bytes are saved to <flight>_image_edits.json for `restore-images`.
+        #[arg(long)]
+        write_images: bool,
         /// Largest trajectory gap around an exposure, seconds.
         #[arg(long, default_value_t = 1.0)]
         max_gap: f64,
@@ -98,7 +109,7 @@ enum Command {
     },
     /// Move the real-time (RTK) camera positions of the MRK by a constant base correction,
     /// e.g. after a PPP solution of the RTK base, and write them for every flight. Images are
-    /// not modified.
+    /// modified only with --write-images.
     #[command(group(ArgGroup::new("shift").required(true).args(["from", "enu"])))]
     #[command(group(ArgGroup::new("target").args(["to", "to_ppp"])))]
     Shift {
@@ -136,9 +147,23 @@ enum Command {
         /// Only write rows for these file roles: jpeg, Green, Red, RedEdge, NIR, tiff.
         #[arg(long, value_delimiter = ',')]
         roles: Vec<String>,
+        /// Geoid grid in the PROJ GeoTIFF format, for orthometric heights in the CSV, e.g.
+        /// ca_nrc_CGG2013an83.tif (CGVD2013, for NAD83(CSRS) positions) from cdn.proj.org. It
+        /// must apply to the frame of the positions (--frame).
+        #[arg(long, value_name = "GRID.tif")]
+        geoid: Option<PathBuf>,
+        /// Also write the positions into the images (EXIF GPS and DJI XMP), in place. The
+        /// original bytes are saved to <flight>_image_edits.json for `restore-images`.
+        #[arg(long)]
+        write_images: bool,
         /// Pairing tolerance between MRK and image times, seconds.
         #[arg(long, default_value_t = DEFAULT_TOLERANCE_S)]
         tolerance: f64,
+    },
+    /// Undo --write-images: put back the original bytes saved in <flight>_image_edits.json.
+    RestoreImages {
+        /// Edit record written by --write-images.
+        file: PathBuf,
     },
     /// Write a synthetic RINEX 3 base-station file covering the default demo flight.
     DemoBase {
@@ -206,6 +231,8 @@ fn main() -> Result<()> {
             no_beidou,
             out,
             roles,
+            geoid,
+            write_images,
             max_gap,
             tolerance,
         } => {
@@ -281,7 +308,11 @@ fn main() -> Result<()> {
                 max_gap_s: max_gap,
                 work_dir: out.join("work"),
             };
-            let filter = row_filter(roles);
+            let outputs = Outputs {
+                filter: row_filter(roles),
+                geoid: open_geoid(geoid.as_deref(), &opts.base.frame)?,
+                write_images,
+            };
             std::fs::create_dir_all(&out).with_context(|| format!("creating {}", out.display()))?;
 
             let mut failures = 0;
@@ -305,9 +336,12 @@ fn main() -> Result<()> {
                 let base_navs = sibling_navs(base_obs);
                 match process_flight(f, base_obs, &base_navs, &rtk, &opts) {
                     Ok(sol) => {
-                        let csv = write_outputs(&out, &name, &sol, &filter)?;
+                        let csv = write_outputs(&out, &name, &sol, &outputs)?;
                         print_solution(&sol);
                         println!("   written: {}", csv.display());
+                        if outputs.write_images {
+                            failures += write_into_images(&out, &name, &sol)?;
+                        }
                     }
                     Err(e) => {
                         println!("   failed: {e}");
@@ -327,6 +361,8 @@ fn main() -> Result<()> {
             frame,
             out,
             roles,
+            geoid,
+            write_images,
             tolerance,
         } => {
             anyhow::ensure!(dir.is_dir(), "{} is not a folder", dir.display());
@@ -392,7 +428,11 @@ fn main() -> Result<()> {
                 );
             }
 
-            let filter = row_filter(roles);
+            let outputs = Outputs {
+                filter: row_filter(roles),
+                geoid: open_geoid(geoid.as_deref(), &frame)?,
+                write_images,
+            };
             std::fs::create_dir_all(&out).with_context(|| format!("creating {}", out.display()))?;
             let mut failures = 0;
             for f in &report.flights {
@@ -409,11 +449,34 @@ fn main() -> Result<()> {
                     failures += 1;
                     continue;
                 }
-                let csv = write_outputs(&out, &name, &sol, &filter)?;
+                let csv = write_outputs(&out, &name, &sol, &outputs)?;
                 print_solution(&sol);
                 println!("   written: {}", csv.display());
+                if outputs.write_images {
+                    failures += write_into_images(&out, &name, &sol)?;
+                }
             }
             std::process::exit(if failures > 0 { 2 } else { 0 });
+        }
+        Command::RestoreImages { file } => {
+            let text =
+                std::fs::read_to_string(&file).with_context(|| format!("reading {}", file.display()))?;
+            let record: serde_json::Value = serde_json::from_str(&text)?;
+            let edits: Vec<FileEdit> = serde_json::from_value(record["edits"].clone())
+                .with_context(|| format!("{} is not an Azimut image edit record", file.display()))?;
+            let (mut restored, mut already, mut failed) = (0, 0, 0);
+            for edit in &edits {
+                match images::revert(edit) {
+                    Ok(true) => restored += 1,
+                    Ok(false) => already += 1,
+                    Err(e) => {
+                        println!("   {}: {e}", edit.path.display());
+                        failed += 1;
+                    }
+                }
+            }
+            println!("{restored} image(s) restored, {already} already original, {failed} not restored.");
+            std::process::exit(if failed > 0 { 2 } else { 0 });
         }
         Command::DemoBase { file } => {
             if let Some(parent) = file.parent() {
@@ -555,11 +618,57 @@ fn row_filter(roles: Vec<String>) -> RowFilter {
     }
 }
 
+/// What to write besides the position files.
+struct Outputs {
+    filter: RowFilter,
+    geoid: Option<GeoidGrid>,
+    write_images: bool,
+}
+
+/// Open the geoid grid and check that it applies to the frame of the positions.
+fn open_geoid(path: Option<&Path>, frame: &str) -> Result<Option<GeoidGrid>> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let grid = GeoidGrid::open(path)?;
+    match grid.check_frame(frame) {
+        Ok(note) => {
+            println!(
+                "\nOrthometric heights: {}, from {} (grid for {}).",
+                grid.vertical_datum(),
+                path.display(),
+                grid.source_frame()
+            );
+            if let Some(n) = note {
+                println!("Note: {n}");
+            }
+            Ok(Some(grid))
+        }
+        Err(e) => anyhow::bail!("--geoid: {e}"),
+    }
+}
+
 /// Write the CSV, geo.txt, JSON and (when needed) problems files of one flight. Returns the
 /// CSV path.
-fn write_outputs(out: &Path, name: &str, sol: &FlightSolution, filter: &RowFilter) -> Result<PathBuf> {
+fn write_outputs(out: &Path, name: &str, sol: &FlightSolution, outputs: &Outputs) -> Result<PathBuf> {
+    let filter = &outputs.filter;
     let csv = out.join(format!("{name}_positions.csv"));
-    std::fs::write(&csv, positions_csv(sol, filter))?;
+    std::fs::write(
+        &csv,
+        positions_csv_with_heights(sol, filter, outputs.geoid.as_ref()),
+    )?;
+    if let Some(g) = &outputs.geoid {
+        let outside = sol
+            .exposures
+            .iter()
+            .flat_map(|e| &e.files)
+            .filter_map(|f| f.camera)
+            .filter(|c| g.undulation(c.lat_deg, c.lon_deg).is_none())
+            .count();
+        if outside > 0 {
+            println!("   WARNING: {outside} file(s) outside the geoid grid: orthometric height left empty");
+        }
+    }
     std::fs::write(out.join(format!("{name}_geo.txt")), odm_geo_txt(sol, filter))?;
     std::fs::write(
         out.join(format!("{name}_solution.json")),
@@ -569,6 +678,49 @@ fn write_outputs(out: &Path, name: &str, sol: &FlightSolution, filter: &RowFilte
         std::fs::write(out.join(format!("{name}_problems.csv")), problems_csv(sol))?;
     }
     Ok(csv)
+}
+
+/// Write the positions into the images of one flight. The edit record is saved before any
+/// image is touched. Returns 1 when some image could not be written, else 0.
+fn write_into_images(out: &Path, name: &str, sol: &FlightSolution) -> Result<i32> {
+    let planned = images::plan_flight(sol);
+    let record = out.join(format!("{name}_image_edits.json"));
+    let skipped: Vec<_> = planned
+        .skipped
+        .iter()
+        .map(|(p, why)| serde_json::json!({ "path": p, "reason": why }))
+        .collect();
+    let doc = serde_json::json!({
+        "frame": sol.frame,
+        "heights": "ellipsoidal",
+        "edits": planned.written,
+        "skipped": skipped,
+    });
+    std::fs::write(&record, serde_json::to_string_pretty(&doc)?)
+        .with_context(|| format!("writing {}", record.display()))?;
+    let mut failed = 0;
+    for edit in &planned.written {
+        if let Err(e) = images::apply(edit) {
+            println!("   image not written: {}: {e}", edit.path.display());
+            failed += 1;
+        }
+    }
+    println!(
+        "   images: {} written in place (EXIF GPS and DJI XMP, ellipsoidal heights), {} skipped, {failed} failed",
+        planned.written.len() - failed,
+        planned.skipped.len()
+    );
+    for (p, why) in planned.skipped.iter().take(5) {
+        println!(
+            "      skipped {}: {why}",
+            p.file_name().unwrap_or_default().to_string_lossy()
+        );
+    }
+    println!(
+        "   original bytes saved: {} (undo: azimut restore-images)",
+        record.display()
+    );
+    Ok(i32::from(failed > 0 || !planned.skipped.is_empty()))
 }
 
 fn print_solution(sol: &FlightSolution) {

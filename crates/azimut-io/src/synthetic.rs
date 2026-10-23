@@ -70,29 +70,112 @@ impl Default for SyntheticFlight {
     }
 }
 
+/// XMP packet with `drone-dji:` attributes and 2 kB of whitespace padding before the
+/// trailer, as DJI writes it (real packets carry 2 to 6 kB).
 fn xmp_packet(attrs: &[(&str, String)]) -> String {
     let mut a = String::new();
     for (k, v) in attrs {
         a.push_str(&format!("\n    drone-dji:{k}=\"{v}\""));
     }
+    let padding = format!("{}\n", " ".repeat(99)).repeat(20);
     format!(
         "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n\
 <x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n  \
 <rdf:Description rdf:about=\"\" xmlns:drone-dji=\"http://www.dji.com/drone-dji/1.0/\"{a}/>\n </rdf:RDF>\n</x:xmpmeta>\n\
-<?xpacket end=\"w\"?>"
+{padding}<?xpacket end=\"w\"?>"
     )
+}
+
+/// Camera position written into a synthetic image: latitude, longitude (degrees),
+/// ellipsoidal height (m).
+pub type Llh = (f64, f64, f64);
+
+/// Little-endian EXIF GPS IFD placed at `at` (offset from the TIFF header), followed by its
+/// values, in DJI's layout: version 2.3, references, degrees/minutes/seconds with seconds
+/// to 1e-4, altitude to 1 mm, map datum `WGS-84`.
+fn gps_ifd(at: u32, (lat, lon, h): Llh) -> Vec<u8> {
+    let n_entries = 8u32;
+    let values_at = at + 2 + 12 * n_entries + 4;
+    let dms = |deg: f64| -> Vec<u8> {
+        let a = deg.abs();
+        let d = a.floor();
+        let m = ((a - d) * 60.0).floor();
+        let sec = ((a - d) * 60.0 - m) * 60.0;
+        [
+            (d as u32, 1u32),
+            (m as u32, 1),
+            ((sec * 1e4).round() as u32, 10_000),
+        ]
+        .iter()
+        .flat_map(|&(n, q)| [n.to_le_bytes(), q.to_le_bytes()])
+        .flatten()
+        .collect()
+    };
+    let mut values = Vec::new();
+    let mut entry = |v: &mut Vec<u8>, tag: u16, typ: u16, count: u32, data: &[u8]| {
+        v.extend_from_slice(&tag.to_le_bytes());
+        v.extend_from_slice(&typ.to_le_bytes());
+        v.extend_from_slice(&count.to_le_bytes());
+        if data.len() <= 4 {
+            let mut inline = [0u8; 4];
+            inline[..data.len()].copy_from_slice(data);
+            v.extend_from_slice(&inline);
+        } else {
+            v.extend_from_slice(&(values_at + values.len() as u32).to_le_bytes());
+            values.extend_from_slice(data);
+        }
+    };
+    let mut v = (n_entries as u16).to_le_bytes().to_vec();
+    entry(&mut v, 0, 1, 4, &[2, 3, 0, 0]);
+    entry(&mut v, 1, 2, 2, &[if lat < 0.0 { b'S' } else { b'N' }, 0]);
+    entry(&mut v, 2, 5, 3, &dms(lat));
+    entry(&mut v, 3, 2, 2, &[if lon < 0.0 { b'W' } else { b'E' }, 0]);
+    entry(&mut v, 4, 5, 3, &dms(lon));
+    entry(&mut v, 5, 1, 1, &[u8::from(h < 0.0)]);
+    let alt = [
+        ((h.abs() * 1000.0).round() as u32).to_le_bytes(),
+        1000u32.to_le_bytes(),
+    ]
+    .concat();
+    entry(&mut v, 6, 5, 1, &alt);
+    entry(&mut v, 18, 2, 8, b"WGS-84\0\0");
+    v.extend_from_slice(&0u32.to_le_bytes());
+    v.extend_from_slice(&values);
+    v
+}
+
+/// EXIF APP1 payload (`Exif\0\0` and a TIFF structure whose IFD0 points to a GPS IFD).
+fn exif_payload(gps: Llh) -> Vec<u8> {
+    let mut t = b"II".to_vec();
+    t.extend_from_slice(&42u16.to_le_bytes());
+    t.extend_from_slice(&8u32.to_le_bytes());
+    // IFD0: one entry, the GPS IFD pointer (tag 34853, LONG).
+    t.extend_from_slice(&1u16.to_le_bytes());
+    t.extend_from_slice(&34853u16.to_le_bytes());
+    t.extend_from_slice(&4u16.to_le_bytes());
+    t.extend_from_slice(&1u32.to_le_bytes());
+    let gps_at = 8 + 2 + 12 + 4;
+    t.extend_from_slice(&(gps_at as u32).to_le_bytes());
+    t.extend_from_slice(&0u32.to_le_bytes());
+    t.extend_from_slice(&gps_ifd(gps_at as u32, gps));
+    [b"Exif\0\0".as_slice(), &t].concat()
 }
 
 /// Metadata-only JPEG: SOI, an EXIF-like APP1 to skip, an XMP APP1, then SOS and EOI.
 pub fn jpeg_with_xmp(xmp: &str) -> Vec<u8> {
+    jpeg_with_xmp_gps(xmp, None)
+}
+
+/// [`jpeg_with_xmp`] whose 20 kB EXIF APP1 (standing in for EXIF and its thumbnail; readers
+/// must skip it) starts with a GPS IFD holding `gps`.
+pub fn jpeg_with_xmp_gps(xmp: &str, gps: Option<Llh>) -> Vec<u8> {
     let mut v = vec![0xFF, 0xD8];
-    // A 20 kB APP1 standing in for EXIF and its thumbnail; readers must skip it.
-    let exif_payload = {
-        let mut p = b"Exif\0\0".to_vec();
-        p.resize(20_000, 0);
-        p
+    let mut exif = match gps {
+        Some(p) => exif_payload(p),
+        None => b"Exif\0\0".to_vec(),
     };
-    push_segment(&mut v, 0xE1, &exif_payload);
+    exif.resize(20_000, 0);
+    push_segment(&mut v, 0xE1, &exif);
     let mut xp = b"http://ns.adobe.com/xap/1.0/\0".to_vec();
     xp.extend_from_slice(xmp.as_bytes());
     push_segment(&mut v, 0xE1, &xp);
@@ -109,14 +192,22 @@ fn push_segment(v: &mut Vec<u8>, marker: u8, payload: &[u8]) {
 
 /// Valid little-endian 16-bit grayscale TIFF, pixels zeroed, XMP in tag 700.
 pub fn tiff_with_xmp(xmp: &str, width: u32, height: u32) -> Vec<u8> {
+    tiff_with_xmp_gps(xmp, width, height, None)
+}
+
+/// [`tiff_with_xmp`] with a GPS IFD (tag 34853) holding `gps`.
+pub fn tiff_with_xmp_gps(xmp: &str, width: u32, height: u32, gps: Option<Llh>) -> Vec<u8> {
     let xmp = xmp.as_bytes();
     let pixels = (width as u64 * height as u64 * 2) as u32;
-    // Layout: header (8) | XMP | pixel strip | IFD at the end, as many writers do.
+    // Layout: header (8) | XMP | GPS IFD | pixel strip | IFD at the end, as many writers do.
     let xmp_off = 8u32;
-    let mut pix_off = xmp_off + xmp.len() as u32;
+    let mut gps_off = xmp_off + xmp.len() as u32;
+    gps_off += gps_off % 2;
+    let gps_bytes = gps.map(|p| gps_ifd(gps_off, p)).unwrap_or_default();
+    let mut pix_off = gps_off + gps_bytes.len() as u32;
     pix_off += pix_off % 2;
     let ifd_off = pix_off + pixels + (pixels % 2);
-    let entries: Vec<(u16, u16, u32, u32)> = vec![
+    let mut entries: Vec<(u16, u16, u32, u32)> = vec![
         (256, 4, 1, width),
         (257, 4, 1, height),
         (258, 3, 1, 16),
@@ -128,11 +219,16 @@ pub fn tiff_with_xmp(xmp: &str, width: u32, height: u32) -> Vec<u8> {
         (279, 4, 1, pixels),
         (700, 1, xmp.len() as u32, xmp_off),
     ];
+    if gps.is_some() {
+        entries.push((34853, 4, 1, gps_off));
+    }
     let mut v = Vec::with_capacity(ifd_off as usize + 2 + entries.len() * 12 + 4);
     v.extend_from_slice(b"II");
     v.extend_from_slice(&42u16.to_le_bytes());
     v.extend_from_slice(&ifd_off.to_le_bytes());
     v.extend_from_slice(xmp);
+    v.resize(gps_off as usize, 0);
+    v.extend_from_slice(&gps_bytes);
     v.resize(pix_off as usize, 0);
     v.resize((pix_off + pixels) as usize, 0);
     v.resize(ifd_off as usize, 0);
@@ -200,18 +296,27 @@ pub fn write_flight(dir: &Path, spec: &SyntheticFlight) -> io::Result<Vec<PathBu
             gps
         };
         let uuid = pseudo_uuid(index as u64 ^ (spec.start_gps_s as u64));
+        // The aircraft's position, written in EXIF and XMP like the MRK's.
+        let pos: Llh = (lat0 + i as f64 * 1.0e-4, lon0, h0);
         let mut base: Vec<(&str, String)> = vec![
             ("UTCAtExposure", format_dji_clock(clock)),
+            ("GpsLatitude", format!("{:+.9}", pos.0)),
+            ("GpsLongitude", format!("{:+.9}", pos.1)),
+            ("AbsoluteAltitude", format!("{:+.3}", pos.2)),
             ("GimbalYawDegree", "+0.50".into()),
             ("GimbalPitchDegree", "-90.00".into()),
             ("GimbalRollDegree", "+0.00".into()),
+            ("RtkFlag", "50".into()),
+            ("RtkStdLon", "0.01000".into()),
+            ("RtkStdLat", "0.01000".into()),
+            ("RtkStdHgt", "0.02000".into()),
         ];
         if spec.with_uuid {
             base.push(("CaptureUUID", uuid));
         }
 
         let jpg = dir.join(format!("DJI_{stamp}_{index:04}_D.JPG"));
-        fs::write(&jpg, jpeg_with_xmp(&xmp_packet(&base)))?;
+        fs::write(&jpg, jpeg_with_xmp_gps(&xmp_packet(&base), Some(pos)))?;
         written.push(jpg);
 
         if spec.multispectral {
@@ -231,7 +336,7 @@ pub fn write_flight(dir: &Path, spec: &SyntheticFlight) -> io::Result<Vec<PathBu
                 attrs.push(("SensorIndex", (k + 1).to_string()));
                 let tif = dir.join(format!("DJI_{stamp}_{index:04}_MS_{token}.TIF"));
                 let (w, h) = spec.band_size;
-                fs::write(&tif, tiff_with_xmp(&xmp_packet(&attrs), w, h))?;
+                fs::write(&tif, tiff_with_xmp_gps(&xmp_packet(&attrs), w, h, Some(pos)))?;
                 written.push(tif);
             }
         }

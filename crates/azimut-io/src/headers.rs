@@ -145,10 +145,10 @@ pub fn read_tiff_xmp(path: &Path) -> Result<RawXmp, Error> {
 }
 
 #[derive(Clone, Copy)]
-struct Endian(bool); // true = little endian
+pub(crate) struct Endian(pub(crate) bool); // true = little endian
 
 impl Endian {
-    fn u16(self, b: &[u8]) -> u16 {
+    pub(crate) fn u16(self, b: &[u8]) -> u16 {
         let a = [b[0], b[1]];
         if self.0 {
             u16::from_le_bytes(a)
@@ -156,7 +156,7 @@ impl Endian {
             u16::from_be_bytes(a)
         }
     }
-    fn u32(self, b: &[u8]) -> u32 {
+    pub(crate) fn u32(self, b: &[u8]) -> u32 {
         let a = [b[0], b[1], b[2], b[3]];
         if self.0 {
             u32::from_le_bytes(a)

@@ -1,20 +1,26 @@
 //! # azimut-export
 //!
-//! Text outputs for camera positions. Images are never modified.
+//! Outputs for camera positions. Images are modified only by [`images`], on request.
 //!
 //! - [`positions_csv`]: one row per image file (all Mavic 3M bands included), with
 //!   1-sigma East/North/Up and the reference frame. Imports into Metashape and Pix4D.
+//!   [`positions_csv_with_heights`] adds orthometric heights from a geoid grid (CGVD2013).
 //!
 //! Each file gets its own position and time: Mavic 3M bands are exposed after the RGB JPEG
 //! that the MRK times, so their row differs from the JPEG's.
 //! - [`odm_geo_txt`]: OpenDroneMap `geo.txt` (EPSG:4326, ellipsoidal heights).
 //! - [`problems_csv`]: exposures without a camera centre or without an uncertainty, and why.
+//! - [`images`]: positions written into the images themselves (EXIF GPS and DJI XMP), in
+//!   place and only on request, with the original bytes kept for undoing.
 //!
 //! An uncertainty that RTKLIB could not give (covariance not positive definite) is left
 //! empty, never written as 0 m: photogrammetry software would read 0 as a perfect position.
 
 use std::fmt::Write as _;
 
+pub mod images;
+
+use azimut_geo::GeoidGrid;
 use azimut_io::mrk::SECONDS_PER_WEEK;
 use azimut_solve::FlightSolution;
 
@@ -48,10 +54,27 @@ fn csv_field(s: &str) -> String {
 
 /// CSV with one row per image file that has a camera centre.
 pub fn positions_csv(sol: &FlightSolution, filter: &RowFilter) -> String {
+    positions_csv_with_heights(sol, filter, None)
+}
+
+/// [`positions_csv`] plus `orthometric_height` (H = h - N) and `vertical_datum` columns from
+/// a geoid grid. The grid must apply to the solution's frame (see
+/// [`GeoidGrid::check_frame`]); outside the grid the height is left empty.
+pub fn positions_csv_with_heights(
+    sol: &FlightSolution,
+    filter: &RowFilter,
+    geoid: Option<&GeoidGrid>,
+) -> String {
     let mut s = String::from(
-        "file,photo,role,gps_week,gps_tow,latitude,longitude,ellipsoidal_height,sigma_east,sigma_north,sigma_up,quality,satellites,frame\n",
+        "file,photo,role,gps_week,gps_tow,latitude,longitude,ellipsoidal_height,sigma_east,sigma_north,sigma_up,quality,satellites,frame",
     );
+    s.push_str(if geoid.is_some() {
+        ",orthometric_height,vertical_datum\n"
+    } else {
+        "\n"
+    });
     let frame = csv_field(&sol.frame);
+    let datum = geoid.map(|g| csv_field(g.vertical_datum()));
     for e in &sol.exposures {
         let Some(t0) = e.gps_s else {
             continue;
@@ -67,7 +90,7 @@ pub fn positions_csv(sol: &FlightSolution, filter: &RowFilter) -> String {
                 .sigma_enu_m
                 .map(|[e, n, u]| format!("{e:.4},{n:.4},{u:.4}"))
                 .unwrap_or_else(|| ",,".into());
-            let _ = writeln!(
+            let _ = write!(
                 s,
                 "{},{},{},{},{:.6},{:.10},{:.10},{:.4},{},{},{},{}",
                 csv_field(&f.file_name),
@@ -83,6 +106,14 @@ pub fn positions_csv(sol: &FlightSolution, filter: &RowFilter) -> String {
                 c.n_sats.map(|n| n.to_string()).unwrap_or_default(),
                 frame
             );
+            if let (Some(g), Some(datum)) = (geoid, &datum) {
+                let h = g
+                    .orthometric_height(c.lat_deg, c.lon_deg, c.h_m)
+                    .map(|h| format!("{h:.4}"))
+                    .unwrap_or_default();
+                let _ = write!(s, ",{h},{datum}");
+            }
+            s.push('\n');
         }
     }
     s
@@ -238,6 +269,38 @@ mod tests {
         // A file that could not be positioned at its own time gets no row.
         sol.exposures[0].files[1].camera = None;
         assert_eq!(positions_csv(&sol, &RowFilter::All).lines().count(), 2);
+    }
+
+    #[test]
+    fn orthometric_heights_from_a_geoid_grid() {
+        use azimut_geo::synthetic::SyntheticGrid;
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("geoid.tif");
+        SyntheticGrid::default().write(&path).unwrap();
+        let g = GeoidGrid::open(&path).unwrap();
+        let mut sol = sample();
+        // The band lies outside the grid: its height is left empty.
+        sol.exposures[0].files[1].camera.as_mut().unwrap().lat_deg = 47.5;
+        let csv = positions_csv_with_heights(&sol, &RowFilter::All, Some(&g));
+        let lines: Vec<&str> = csv.lines().collect();
+        assert!(lines[0].ends_with(",frame,orthometric_height,vertical_datum"));
+        let h = 119.82 - SyntheticGrid::expected(46.35, -72.55);
+        assert!(
+            lines[1].ends_with(&format!(",{h:.4},CGVD2013(CGG2013a) height (EPSG:9245)")),
+            "{}",
+            lines[1]
+        );
+        assert!(
+            lines[2].ends_with(",,CGVD2013(CGG2013a) height (EPSG:9245)"),
+            "{}",
+            lines[2]
+        );
+        // Without a grid the columns are not written.
+        assert!(positions_csv(&sol, &RowFilter::All)
+            .lines()
+            .next()
+            .unwrap()
+            .ends_with(",frame"));
     }
 
     #[test]

@@ -9,8 +9,13 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+azimut-geo.workspace = true
 azimut-io.workspace = true
 azimut-solve.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
+azimut-geo = { workspace = true, features = ["synthetic"] }
+azimut-io = { workspace = true, features = ["synthetic"] }
+serde_json.workspace = true
 tempfile.workspace = true

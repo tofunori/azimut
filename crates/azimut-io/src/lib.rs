@@ -5,6 +5,7 @@
 //!
 //! - [`mrk`]: DJI `*.MRK` exposure logs, read by field suffix.
 //! - [`headers`]: XMP from JPEG APP1 segments and TIFF tag 700, without reading pixels.
+//! - [`layout`]: file offsets of the XMP packet and EXIF GPS entries, for in-place writes.
 //! - [`xmp`]: the `drone-dji:` fields Azimut uses.
 //! - [`photo`]: per-image metadata (band, `CaptureUUID`, exposure time, file number).
 //! - [`rinex`]: RINEX header, first and last epoch, without reading the whole file.
@@ -19,6 +20,7 @@ pub mod capture;
 pub mod csrs_ppp;
 pub mod error;
 pub mod headers;
+pub mod layout;
 pub mod matching;
 pub mod mrk;
 pub mod photo;
