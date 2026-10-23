@@ -57,6 +57,7 @@ RTKLIB-EX, le moteur GNSS, est inclus. On peut aussi télécharger une archive d
 ```sh
 azimut scan    vols/ --base base.24o                                                     # vérifier, en secondes
 azimut process vols/ --base base.24o --base-ppp base.sum --report-lang fr --out resultats  # PPK + rapport
+azimut process vols/ --base base.24o --submit-ppp --email vous@labo.ca --report-lang fr --out resultats  # base soumise à CSRS-PPP, puis PPK
 ```
 
 <p align="center">

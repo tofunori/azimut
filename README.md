@@ -57,6 +57,7 @@ RTKLIB-EX, the GNSS engine, comes with it. Or download an archive from the
 ```sh
 azimut scan    flights/ --base base.24o                                   # check, in seconds
 azimut process flights/ --base base.24o --base-ppp base.sum --out results  # PPK + report
+azimut process flights/ --base base.24o --submit-ppp --email you@lab.ca --out results  # base sent to CSRS-PPP, then PPK
 ```
 
 <p align="center">
