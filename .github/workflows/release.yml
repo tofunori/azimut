@@ -16,7 +16,7 @@ permissions:
 env:
   # RTKLIB-EX commit built into the archives (BSD-2; its licence ships with them).
   RTKLIB_REPO: https://github.com/rtklibexplorer/RTKLIB
-  RTKLIB_COMMIT: 50886e2
+  RTKLIB_COMMIT: "50886e2fef3da7aa49fe87405cf52ff99972711d"
 
 jobs:
   build:
