@@ -243,6 +243,13 @@ On one Mavic 3M flight (firmware 11.08.01.41, August 2024, 13 captures and the f
   `Green`, `Red`, `RedEdge`, `NIR`; MRK record number equals the file number.
 - The MRK can hold more records than images (here 454 for 450 captures, the last capture
   with only JPEG and Green): unpaired records and incomplete captures are reported.
+- PPK of the same flight (no RTK: all 454 MRK records single) against the IGS station KUJ2,
+  7.6 km away, logging every 30 s (Septentrio PolarX5, `AOAD/M_T_RFI_T NONE` from
+  `igs20.atx`, base at its daily IGS20 position from the Nevada Geodetic Laboratory):
+  95.6 % of 9278 trajectory epochs fixed, all 13 captures fixed, median sigma 2 / 3 / 4 mm
+  (E / N / U), in 1 min 40 s. The fixed camera centres sit a nearly constant 1.1 m north,
+  0.4 m east and 3 m below the MRK single-point positions, and the bands 9.4 cm along track
+  from their JPEG.
 
 ## To confirm on real data
 
