@@ -143,6 +143,7 @@ fn submit_wait_download_extract() {
     assert_eq!(r.files.len(), 3);
     assert_eq!(r.summary_path, out.join("BASE2070.sum"));
     assert_eq!(r.summary.rinex.as_deref(), Some("BASE2070.24O"));
+    assert_eq!(r.notes, None, "an empty errors.txt is no note");
     let p = r.summary.position(None).unwrap();
     assert_eq!(p.system, "IGS20");
     assert_eq!(p.h_ell_m, 31.204);
@@ -231,6 +232,23 @@ fn archive_paths_stay_in_the_folder() {
     let e = extract(KEY, &zip, &out).unwrap_err();
     assert!(e.to_string().contains("unsafe file name"), "{e}");
     assert!(!tmp.path().join("escape.sum").exists());
+}
+
+#[test]
+fn warnings_come_with_the_solution() {
+    let tmp = tempfile::tempdir().unwrap();
+    let zip = results_zip(&[
+        ("X.sum", SUM),
+        (
+            "errors.txt",
+            "\nWARNING: no Galileo antenna calibration, GPS values used\n\n",
+        ),
+    ]);
+    let r = extract(KEY, &zip, tmp.path()).unwrap();
+    assert_eq!(
+        r.notes.as_deref(),
+        Some("WARNING: no Galileo antenna calibration, GPS values used")
+    );
 }
 
 #[test]

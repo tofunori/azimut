@@ -24,6 +24,10 @@ fn serve(status: &'static str) -> String {
     zip.start_file("BASE2070.sum", zip::write::SimpleFileOptions::default())
         .unwrap();
     zip.write_all(SUM.as_bytes()).unwrap();
+    zip.start_file("errors.txt", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    zip.write_all(b"WARNING: no Galileo antenna calibration, GPS values used\n")
+        .unwrap();
     let archive = zip.finish().unwrap().into_inner();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}/CSRS-PPP/service", listener.local_addr().unwrap());
@@ -100,6 +104,10 @@ fn submit_and_save_results() {
     assert!(stdout.contains(KEY), "{stdout}");
     assert!(stdout.contains("46.349123"), "{stdout}");
     assert!(stdout.contains("--base-ppp"), "{stdout}");
+    assert!(
+        stdout.contains("CSRS-PPP notes (errors.txt):\n     WARNING: no Galileo antenna calibration"),
+        "{stdout}"
+    );
     assert!(out.join("BASE2070.sum").is_file());
     assert!(out.join("BASE2070_csrs_ppp.zip").is_file());
 }

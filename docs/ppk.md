@@ -60,7 +60,8 @@ azimut ppp /path/to/base.26o --out results/csrs_ppp       # ITRF by default; --s
 azimut process /path/to/campaign --base /path/to/base.26o --submit-ppp --antex igs20.atx --out results
 ```
 
-The tracking key is printed at submission. If the wait times out, or the connection drops,
+Warnings that CSRS-PPP writes in `errors.txt` with its solution (a missing antenna
+calibration, say) are printed under the position. The tracking key is printed at submission. If the wait times out, or the connection drops,
 `azimut ppp --resume <key>` fetches the results later. CSRS-PPP has no documented public API:
 Azimut uses the interface of NRCan's own `csrs_ppp_auto.py` script, kept in one crate
 (`azimut-csrs`) so it can be fixed quickly if NRCan changes it. Proxies are taken from
