@@ -307,10 +307,12 @@ fn main() -> Result<()> {
             print_report(&report);
             let rtk = Rtklib::locate(rtklib.as_deref())?;
 
+            let mut ppp_notes = None;
             let (ppp, ppp_path, ppp_system) = if submit_ppp {
                 let rinex = submitted_base(&report)?;
                 let r = csrs_fetch(Some(&rinex), None, &csrs, &out.join("csrs_ppp"))?;
                 let system = ppp_system.or_else(|| system_of(&r.summary, csrs.sysref));
+                ppp_notes = r.notes;
                 (Some(r.summary), Some(r.summary_path), system)
             } else {
                 match &base_ppp {
@@ -324,6 +326,7 @@ fn main() -> Result<()> {
                         .map_err(anyhow::Error::msg)
                         .with_context(|| format!("CSRS-PPP summary {}", path.display()))?;
                     print_ppp(sum, ppp_system.as_deref(), &point)?;
+                    print_ppp_notes(ppp_notes.as_deref());
                     if let Some(f) = frame {
                         setup.frame = f;
                     }
@@ -533,6 +536,7 @@ fn main() -> Result<()> {
             let (_, point) =
                 BaseSetup::from_ppp(&r.summary, system.as_deref(), true).map_err(anyhow::Error::msg)?;
             print_ppp(&r.summary, system.as_deref(), &point)?;
+            print_ppp_notes(r.notes.as_deref());
             if r.summary.positions.len() > 1 {
                 let all: Vec<&str> = r.summary.positions.iter().map(|p| p.system.as_str()).collect();
                 println!(
@@ -762,6 +766,16 @@ fn csrs_fetch(
         r.files.len()
     );
     Ok(r)
+}
+
+/// Warnings CSRS-PPP wrote in errors.txt alongside its solution.
+fn print_ppp_notes(notes: Option<&str>) {
+    if let Some(text) = notes {
+        println!("   CSRS-PPP notes (errors.txt):");
+        for line in text.lines() {
+            println!("     {line}");
+        }
+    }
 }
 
 /// The summary system matching the reference system asked for, when it holds several.

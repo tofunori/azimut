@@ -227,6 +227,9 @@ pub struct Results {
     /// The summary (`*.sum`) among them.
     pub summary_path: PathBuf,
     pub summary: PppSummary,
+    /// `errors.txt` when not empty: the service's warnings (e.g. a missing antenna
+    /// calibration) even when it produced a solution.
+    pub notes: Option<String>,
 }
 
 /// Write the files of a results archive into `dir` and read its summary. Archive paths are
@@ -266,20 +269,20 @@ pub fn extract(key: &str, archive: &[u8], dir: &Path) -> Result<Results, Error> 
         .iter()
         .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("sum")))
         .collect();
+    // The service writes its diagnosis and warnings in errors.txt.
+    let notes = files
+        .iter()
+        .find(|p| {
+            p.file_name()
+                .is_some_and(|n| n.eq_ignore_ascii_case("errors.txt"))
+        })
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty());
     let summary_path = match sums.as_slice() {
         [one] => (*one).clone(),
         [] => {
-            // The service puts its diagnosis in errors.txt when it could not process the file.
-            let errors = files
-                .iter()
-                .find(|p| {
-                    p.file_name()
-                        .is_some_and(|n| n.eq_ignore_ascii_case("errors.txt"))
-                })
-                .and_then(|p| std::fs::read_to_string(p).ok())
-                .map(|t| t.trim().to_string())
-                .filter(|t| !t.is_empty());
-            return Err(bad(match errors {
+            return Err(bad(match notes {
                 Some(t) => format!("no summary (.sum) in the archive; errors.txt says: {t}"),
                 None => "no summary (.sum) in the archive".into(),
             }));
@@ -291,6 +294,7 @@ pub fn extract(key: &str, archive: &[u8], dir: &Path) -> Result<Results, Error> 
         files,
         summary_path,
         summary,
+        notes,
     })
 }
 
