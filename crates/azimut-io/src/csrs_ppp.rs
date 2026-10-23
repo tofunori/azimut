@@ -6,7 +6,7 @@
 //! `ANT` names the antenna CSRS-PPP found in its calibration file (`NOT FOUND` otherwise) and
 //! `ARP` gives the antenna offsets it applied, which come from the RINEX `ANTENNA: DELTA
 //! H/E/N` record. Lines are read by keyword, so records added in later versions are skipped.
-//! Layout checked on versions 3.54.2 (2022) and 4.14.11 (2024). See SOURCES.md (CSRS-PPP).
+//! Layout checked on versions 3.54.2 (2022), 4.14.11 (2024) and 5.15 (2026). See SOURCES.md (CSRS-PPP).
 
 use std::path::Path;
 
