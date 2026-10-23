@@ -1,0 +1,21 @@
+name: Data from a new drone or firmware
+description: Help Azimut support a drone, camera or firmware it has not been checked on
+labels: [hardware]
+body:
+  - type: input
+    id: drone
+    attributes:
+      label: Drone, camera and firmware
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files on the SD card
+      description: The file names of one flight folder (images, MRK, raw GNSS log), and the output of `azimut scan`.
+      render: text
+  - type: textarea
+    id: share
+    attributes:
+      label: What you can share
+      description: Whether a small extract (MRK, a few images, the raw log) can be shared under an open licence for testing.

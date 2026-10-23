@@ -45,6 +45,10 @@ pub struct SyntheticFlight {
     pub with_uuid: bool,
     /// Band exposure time minus JPEG exposure time, seconds (about 0.026 on a real Mavic 3M).
     pub band_delay_s: f64,
+    /// Fly a survey pattern (lines of 12 captures back and forth) with standard deviations
+    /// that vary along the flight, instead of a straight line with constant ones. For
+    /// demonstrations; the tests use the straight line.
+    pub survey: bool,
 }
 
 impl Default for SyntheticFlight {
@@ -66,6 +70,7 @@ impl Default for SyntheticFlight {
             band_size: (1, 1),
             with_uuid: true,
             band_delay_s: 0.0,
+            survey: false,
         }
     }
 }
@@ -259,11 +264,54 @@ pub fn mrk_line(
     h: f64,
     flag: u16,
 ) -> String {
+    mrk_line_std(
+        index,
+        gps_s,
+        offset_ned_mm,
+        (lat, lon, h),
+        [0.01, 0.01, 0.02],
+        flag,
+    )
+}
+
+/// [`mrk_line`] with given North, East, Up standard deviations (m).
+pub fn mrk_line_std(
+    index: u32,
+    gps_s: f64,
+    offset_ned_mm: [i32; 3],
+    (lat, lon, h): Llh,
+    std_neu_m: [f64; 3],
+    flag: u16,
+) -> String {
     let (week, tow) = week_tow(gps_s);
+    let [sn, se, su] = std_neu_m;
     format!(
-        "{index}\t{tow:.6}\t[{week}]\t{:>6},N\t{:>6},E\t{:>6},V\t{lat:.8},Lat\t{lon:.8},Lon\t{h:.3},Ellh\t0.010000, 0.010000, 0.020000\t{flag},Q",
+        "{index}\t{tow:.6}\t[{week}]\t{:>6},N\t{:>6},E\t{:>6},V\t{lat:.8},Lat\t{lon:.8},Lon\t{h:.3},Ellh\t{sn:.6}, {se:.6}, {su:.6}\t{flag},Q",
         offset_ned_mm[0], offset_ned_mm[1], offset_ned_mm[2]
     )
+}
+
+/// Position and North, East, Up standard deviations of capture `i`.
+fn flight_point(spec: &SyntheticFlight, i: usize) -> (Llh, [f64; 3]) {
+    let (lat0, lon0, h0) = (46.3500, -72.5500, 120.0);
+    if !spec.survey {
+        return ((lat0 + i as f64 * 1.0e-4, lon0, h0), [0.01, 0.01, 0.02]);
+    }
+    // Lines of 12 captures 22 m apart, flown east then west, 35 m between lines.
+    let (per_line, step_m, spacing_m) = (12usize, 22.0, 35.0);
+    let (line, k) = (i / per_line, i % per_line);
+    let along = if line % 2 == 0 { k } else { per_line - 1 - k } as f64 * step_m;
+    let m_per_deg = 111_320.0;
+    let lat = lat0 + line as f64 * spacing_m / m_per_deg;
+    let lon = lon0 + along / (m_per_deg * lat0.to_radians().cos());
+    let t = i as f64;
+    let wave = (t / 6.0).sin();
+    let std = [
+        0.012 + 0.004 * wave,
+        0.010 + 0.003 * (t / 6.0 + 0.8).sin(),
+        0.020 + 0.007 * (t / 6.0 + 0.4).sin(),
+    ];
+    ((lat, lon, h0 + 0.4 * (t / 9.0).sin()), std)
 }
 
 fn pseudo_uuid(seed: u64) -> String {
@@ -285,7 +333,6 @@ pub fn write_flight(dir: &Path, spec: &SyntheticFlight) -> io::Result<Vec<PathBu
     fs::create_dir_all(dir)?;
     let mut written = Vec::new();
     let mut mrk = String::new();
-    let (lat0, lon0, h0) = (46.3500, -72.5500, 120.0);
     for i in 0..spec.captures {
         let gps = spec.start_gps_s + i as f64 * spec.interval_s;
         let index = spec.first_index + i as u32;
@@ -297,7 +344,7 @@ pub fn write_flight(dir: &Path, spec: &SyntheticFlight) -> io::Result<Vec<PathBu
         };
         let uuid = pseudo_uuid(index as u64 ^ (spec.start_gps_s as u64));
         // The aircraft's position, written in EXIF and XMP like the MRK's.
-        let pos: Llh = (lat0 + i as f64 * 1.0e-4, lon0, h0);
+        let (pos, std_neu) = flight_point(spec, i);
         let mut base: Vec<(&str, String)> = vec![
             ("UTCAtExposure", format_dji_clock(clock)),
             ("GpsLatitude", format!("{:+.9}", pos.0)),
@@ -343,8 +390,7 @@ pub fn write_flight(dir: &Path, spec: &SyntheticFlight) -> io::Result<Vec<PathBu
 
         if !spec.drop_mrk_at.contains(&i) {
             let flag = if spec.float_at.contains(&i) { 34 } else { 50 };
-            let lat = lat0 + i as f64 * 1.0e-4;
-            mrk.push_str(&mrk_line(index, gps, [12, -3, 180], lat, lon0, h0, flag));
+            mrk.push_str(&mrk_line_std(index, gps, [12, -3, 180], pos, std_neu, flag));
             mrk.push('\n');
         }
     }

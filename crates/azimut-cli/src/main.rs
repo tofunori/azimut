@@ -210,6 +210,9 @@ enum Command {
         /// Write image times as UTC instead of GPS time.
         #[arg(long)]
         utc: bool,
+        /// Fly a survey pattern (back-and-forth lines) with varying uncertainties.
+        #[arg(long)]
+        survey: bool,
     },
 }
 
@@ -541,10 +544,12 @@ fn main() -> Result<()> {
             captures,
             full_size,
             utc,
+            survey,
         } => {
             let spec = SyntheticFlight {
                 captures,
                 clock_is_utc: utc,
+                survey,
                 band_size: if full_size { M3M_BAND_SIZE } else { (1, 1) },
                 drop_nir_at: if captures > 5 { vec![5] } else { vec![] },
                 float_at: if captures > 3 { vec![2, 3] } else { vec![] },

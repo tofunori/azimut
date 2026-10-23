@@ -219,3 +219,35 @@ fn report_serialises_to_json() {
     let json = serde_json::to_string(&r).unwrap();
     assert!(json.contains("\"clock\":\"gps_time\""));
 }
+
+#[test]
+fn survey_demo_flight_pairs_every_capture() {
+    use azimut_io::scan::{scan, ScanOptions};
+    use azimut_io::synthetic::{write_flight, SyntheticFlight};
+    let tmp = tempfile::tempdir().unwrap();
+    write_flight(
+        tmp.path(),
+        &SyntheticFlight {
+            captures: 30,
+            survey: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let r = scan(tmp.path(), &ScanOptions::default());
+    let f = &r.flights[0];
+    assert_eq!(f.matching.pairs.len(), 30);
+    // Back-and-forth lines: capture 13 (second line, flown west) starts where line 1 ended.
+    let lon = |i: usize| f.mrk[i].record.lon_deg;
+    assert!(lon(11) > lon(0) && (lon(12) - lon(11)).abs() < 1e-9 && lon(23) < lon(12));
+    let std: Vec<f64> = f
+        .mrk
+        .iter()
+        .filter_map(|m| m.record.std_neu_m)
+        .map(|s| s[2])
+        .collect();
+    assert!(
+        std.iter().any(|&u| u > 0.025) && std.iter().any(|&u| u < 0.015),
+        "varying sigmas"
+    );
+}
