@@ -35,7 +35,7 @@ or interface text of closed-source tools as a source.
 | MRK has one line per RGB photo (captures), not per file | `matching.rs` | [Emlid community](https://community.emlid.com/t/ppk-processing-of-multispectral-drone-data/39286); [DJI Terra accuracy notes](https://terra.dji.com/user-manual/ko/accuracy-whitepaper/photogrammetry-accuracy.html) |
 | The MRK times the RGB JPEG; the four band TIFFs are exposed 26.3 ± 0.3 ms later, together (spread under 0.5 ms), so each file is positioned at its own `UTCAtExposure` | `pipeline.rs` (`time_offset_s`, `place_files`), `rtk_shift.rs` | Own measurement, same flight as above: 13 captures, JPEG `UTCAtExposure` equal to the MRK time within 1 µs |
 | One XMP packet per JPEG and per TIFF; MRK record number equals the file number | `headers.rs`, `matching.rs` | Own measurement, same flight |
-| Radiometric XMP tags must survive any edit; Pillow/ImageMagick/GDAL rewrite or drop metadata | design rule (read-only by default) | Mavic 3M Image Processing Guide; [ImageMagick #1674](https://github.com/ImageMagick/ImageMagick/issues/1674) |
+| Radiometric XMP tags must survive any edit; Pillow/ImageMagick/GDAL rewrite or drop metadata | design rule (read-only by default; `--write-images` changes only position values in place) | Mavic 3M Image Processing Guide; [ImageMagick #1674](https://github.com/ImageMagick/ImageMagick/issues/1674) |
 
 ## Folder layout and pitfalls
 
@@ -97,6 +97,25 @@ Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](
 | Interpolate the antenna to the exposure time, then add the lever arm rotated from NED to ECEF at that position; no extrapolation | `camera.rs` | [dji-geotagger pipeline.md](https://github.com/geo-raypan/dji-geotagger/blob/main/docs/pipeline.md) |
 | Check: camera height = antenna height minus the Down offset | `camera.rs` (`height_check_m`) | Same |
 | GRS80 ellipsoid (ITRF, NAD83) | `geodesy.rs` | Moritz (1980), Geodetic Reference System 1980 |
+
+## Geoid grids (CGVD2013)
+
+| Rule | Where | Source |
+|---|---|---|
+| PROJ GeoTIFF grids: `TYPE=VERTICAL_OFFSET_GEOGRAPHIC_TO_VERTICAL` holds the geoid undulation N (`geoid_undulation`, positive upward from the ellipsoid), so H = h - N; values scaled by `SCALE`/`OFFSET` from the GDAL metadata; nodata in `GDAL_NODATA` (raw value); CDN grids are pixel-is-point, pixel-is-area shifts by half a cell; bilinear interpolation by default | `azimut-geo` `geoid.rs` | [PROJ, Geodetic TIFF grids (GTG) specification](https://proj.org/en/stable/specifications/geodetictiffgrids.html) |
+| CGG2013a is published for NAD83(CSRS)v6 (`ca_nrc_CGG2013an83.tif`) and ITRF2008 (`ca_nrc_CGG2013ai08.tif`); each file names its frame in `ImageDescription` | `geoid.rs` (`check_frame`) | [cdn.proj.org](https://cdn.proj.org/), files converted by PROJ from NRCan's CGG2013a (Open Government Licence - Canada) |
+| The two CGG2013a grids differ by 0.13 to 1.12 m at 12 points across Canada, so a grid used with positions in the other frame is refused | `geoid.rs` (`check_frame`) | Own measurement with both grids (Azimut and PROJ 9.8.1 agree within 0.05 mm at every point) |
+
+## Writing positions into images
+
+| Rule | Where | Source |
+|---|---|---|
+| EXIF GPS IFD (pointer tag 34853): `GPSLatitudeRef`/`GPSLongitudeRef` ASCII x 2, `GPSLatitude`/`GPSLongitude` RATIONAL x 3 (degrees, minutes, seconds), `GPSAltitudeRef` BYTE (1 = below the reference), `GPSAltitude` RATIONAL in metres | `azimut-io` `layout.rs`, `azimut-export` `images.rs` | [CIPA DC-008-2012, Exif 2.3, GPS attribute information](https://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf) |
+| XMP packets carry whitespace padding before `<?xpacket end` so they can be edited in place (2 to 4 kB recommended) | `images.rs` (`patch_xmp`) | [Adobe XMP Specification Part 3](https://archimedespalimpsest.net/Documents/External/XMP/XMPSpecificationPart3.pdf) |
+| Mavic 3M XMP packets hold 2.8 to 5.9 kB of padding (three files measured); DJI writes `drone-dji:` fields as attributes; EXIF seconds to 1e-4, altitude to 1 mm | `images.rs` | Own measurement, Mavic 3M flight above (JPEG and TIFF) |
+| DJI writes the ellipsoidal height in EXIF `GPSAltitude` and XMP `AbsoluteAltitude` (both equal the MRK `Ellh`), with `GPSAltitudeRef` 0 and `GPSMapDatum` `WGS-84`; the band TIFFs carry their own position | `images.rs` (heights written ellipsoidal) | Own measurement, same flight, read with ExifTool 12.76 |
+| OpenDroneMap reads DJI XMP fields only as attributes (`@drone-dji:SensorGain`, `ExposureTime`, `CaptureUUID`, `FlightYawDegree`...), takes the altitude from `@drone-dji:AbsoluteAltitude` over EXIF and the accuracy from `RtkStdLon/Lat/Hgt` | `images.rs` (attribute form kept; `AbsoluteAltitude` and `RtkStd*` written) | [OpenDroneMap photo.py](https://raw.githubusercontent.com/OpenDroneMap/ODM/master/opendm/photo.py) (`get_xmp_tag`, `parse_exif_values`) |
+| ExifTool 12.76, asked to write one DJI XMP field, rewrites every field of the packet as an element, which OpenDroneMap then no longer reads; it also drops empty attributes | `images.rs` (in-place writing instead of ExifTool) | Own measurement on copies of the Mavic 3M files |
 
 ## Outputs
 

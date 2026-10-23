@@ -1,0 +1,21 @@
+[package]
+name = "azimut-geo"
+description = "Reference-frame and height-datum tools for Azimut: geoid grids for orthometric heights (CGVD2013)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+# Small geoid grids in the PROJ GeoTIFF layout, for tests.
+synthetic = []
+
+[dependencies]
+thiserror.workspace = true
+tiff.workspace = true
+
+[dev-dependencies]
+azimut-geo = { path = ".", features = ["synthetic"] }
+tempfile.workspace = true

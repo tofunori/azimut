@@ -19,3 +19,4 @@ clap.workspace = true
 serde_json.workspace = true
 azimut-solve.workspace = true
 azimut-export.workspace = true
+azimut-geo.workspace = true

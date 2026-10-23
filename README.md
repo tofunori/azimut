@@ -5,8 +5,9 @@ multispectral datasets, explicit about reference frames, and validated against g
 
 > **Status: early development.** Azimut scans and diagnoses DJI flight folders, runs PPK
 > through RTKLIB-EX, computes camera centres with the MRK lever arm, and writes CSV and
-> OpenDroneMap files (Mavic 3M bands included). Coordinate transformations (NAD83(CSRS),
-> CGVD2013) and the quality report come next. Everything is tested on synthetic data built
+> OpenDroneMap files (Mavic 3M bands included), with CGVD2013 heights from a geoid grid and,
+> on request, the positions written into the images. Frame transformations (ITRF to
+> NAD83(CSRS)) and the quality report come next. Everything is tested on synthetic data built
 > from public DJI documentation and with stand-in RTKLIB programs; it still has to be
 > confirmed on real SD-card copies and against checkpoints.
 
@@ -29,8 +30,9 @@ quality. Azimut does that work in the open.
 - **Headers only.** Metadata is read from JPEG APP1 segments and TIFF tag 700. Pixels are
   never read, so a 4 GB multispectral flight scans in a fraction of a second.
 - **Images are read-only by default.** Positions go to external files (ODM `geo.txt`,
-  Metashape/Pix4D CSV). Writing into images will be an explicit option that checks the
-  radiometric metadata of Mavic 3M TIFFs stays intact.
+  Metashape/Pix4D CSV). `--write-images` writes them into the images in place, changing only
+  the position fields and keeping every other byte (Mavic 3M radiometric metadata
+  included); the original bytes are saved so that `restore-images` can undo it.
 - **Pair on time, never on file order.** MRK GPS week/time of week is matched to XMP
   `UTCAtExposure`. Whether that field holds GPS time or UTC is decided from the data.
 - **Read by meaning, not by position.** MRK values are read by their suffix (`,N`, `,Lat`,
@@ -114,8 +116,8 @@ CSRS-PPP's orthometric height is printed but outputs stay ellipsoidal.
 
 Coordinates are in the frame of the base coordinates you give. Without `--base-llh`, the
 approximate position from the base RINEX header is used: positions are then precise
-relative to each other but not in absolute terms. Heights are ellipsoidal; orthometric
-heights (CGVD2013) come with `azimut-geo`.
+relative to each other but not in absolute terms. Heights are ellipsoidal; `--geoid` adds
+orthometric heights (see below).
 
 Defaults for DJI aircraft: L1+L2, GPS + GLONASS + Galileo + BeiDou, 15° mask, continuous
 ambiguity resolution with ratio 3, GLONASS ambiguities left float (base and drone receivers
@@ -154,9 +156,65 @@ Files exposed at another time than the RGB JPEG (Mavic 3M bands) are placed by l
 interpolation between this MRK record and the next one, if both are RTK and less than 10 s
 apart; otherwise they get no position and are listed in `problems.csv`.
 
-Images are not modified: the positions go to the CSV and `geo.txt` files that Metashape,
-Pix4D and ODM import. Writing them into the images will come with the ExifTool option, which
-first has to check that the radiometric metadata of Mavic 3M TIFFs stays intact.
+Images are not modified unless `--write-images` is given (see below): the positions go to
+the CSV and `geo.txt` files that Metashape, Pix4D and ODM import.
+
+### Orthometric heights (CGVD2013)
+
+`--geoid` (with `process` or `shift`) adds `orthometric_height` and `vertical_datum` columns
+to the CSV, H = h - N, with the geoid undulation N interpolated bilinearly in a grid in the
+PROJ GeoTIFF format. For CGVD2013, download NRCan's CGG2013a converted by PROJ (Open
+Government Licence - Canada):
+
+| Positions in | Grid |
+|---|---|
+| NAD83(CSRS), e.g. from CSRS-PPP | [`ca_nrc_CGG2013an83.tif`](https://cdn.proj.org/ca_nrc_CGG2013an83.tif) |
+| ITRF or IGS frames | [`ca_nrc_CGG2013ai08.tif`](https://cdn.proj.org/ca_nrc_CGG2013ai08.tif) |
+
+```sh
+./target/release/azimut process /path/to/campaign ... --base-ppp 12345678.sum \
+    --geoid ca_nrc_CGG2013an83.tif --out results
+```
+
+A grid applies to ellipsoidal heights in one frame, and the two grids differ by 0.1 to 1.1 m
+at 12 points across Canada, so Azimut refuses a grid made for another frame family than `--frame`
+(NAD83(CSRS) positions with the ITRF grid, say). Within a family (NAD83(CSRS) v6 and v8,
+ITRF2008 and IGS20) it notes that the difference between realisations is not applied.
+Positions outside the grid get an empty height. `geo.txt` and the images keep ellipsoidal
+heights.
+
+### Writing positions into the images
+
+`--write-images` (with `process` or `shift`) also writes each file's position into the file
+itself, in place:
+
+- EXIF GPS: `GPSLatitude`, `GPSLongitude` (to 1e-6 arc-second), `GPSAltitude` (to 0.1 mm)
+  and their reference letters;
+- DJI XMP: `drone-dji:GpsLatitude`, `GpsLongitude`, `AbsoluteAltitude`, and the 1-sigma
+  `RtkStdLon` (East), `RtkStdLat` (North), `RtkStdHgt` (Up).
+
+Heights are ellipsoidal in the frame of the positions, as DJI writes them: on the Mavic 3M,
+EXIF `GPSAltitude`, XMP `AbsoluteAltitude` and the MRK `Ellh` hold the same value, although
+EXIF defines the altitude above sea level. `GPSMapDatum` (`WGS-84`), `RtkFlag` and all other
+fields are left as they are: the CSV records the frame.
+
+Only the bytes of those values change. Each value is written in the existing field, at the
+same size: EXIF rationals keep their 8 bytes, and an XMP value that gets longer or shorter
+takes from or gives back to the packet's whitespace padding. The file keeps its length, its
+other bytes and the attribute form of the DJI XMP, which matters because OpenDroneMap reads
+DJI XMP fields (sensor gain, exposure time, `CaptureUUID`, angles, altitude, accuracy) only
+as attributes. General tools rewrite the whole packet: ExifTool 12.76, asked to change one
+DJI XMP field, rewrites every field as an element. Before writing, Azimut checks that the new
+XMP parses to the same fields apart from the written ones; a file without these fields, with
+its XMP already rewritten, or without an uncertainty for the position is skipped and listed.
+
+The original bytes of every change are saved first to `<flight>_image_edits.json`, and
+
+```sh
+./target/release/azimut restore-images results/<flight>_image_edits.json
+```
+
+puts them back (a file that changed since is left alone). Keep a copy of the SD card anyway.
 
 ### RINEX checks
 
@@ -221,10 +279,10 @@ manuals. Tested so far on synthetic data only.
    ECEF solutions with full covariance, interpolation, MRK lever arm. Next: per-drone
    profiles tested on real logs, merging logs split at 999 photos. This release: CSRS-PPP
    summaries as base position (`--base-ppp`, `--to-ppp`), and `shift` for RTK flights.
-3. **`azimut-geo`**: NAD83(CSRS) with epoch, CGVD2013, refusal of approximate
-   transformations.
-4. **`azimut-export`** (this release: CSV, ODM `geo.txt`): camera angles and accuracy in
-   `geo.txt`, Pix4D-specific CSV, optional in-place writing with ExifTool.
+3. **`azimut-geo`** (this release: CGVD2013 from PROJ geoid grids, with a frame check):
+   NAD83(CSRS) with epoch, refusal of approximate transformations.
+4. **`azimut-export`** (this release: CSV, ODM `geo.txt` with angles and accuracy, in-place
+   writing into the images with undo): Pix4D-specific CSV.
 5. **`azimut-report`**: quality report (fix rate, uncertainty map, base distance).
 6. **App**: native desktop interface (GPUI).
 7. **Validation**: checkpoints (ASPRS Ed. 2), comparison with other tools, open test dataset.
@@ -250,11 +308,19 @@ On one Mavic 3M flight (firmware 11.08.01.41, August 2024, 13 captures and the f
   (E / N / U), in 1 min 40 s. The fixed camera centres sit a nearly constant 1.1 m north,
   0.4 m east and 3 m below the MRK single-point positions, and the bands 9.4 cm along track
   from their JPEG.
+- `--write-images` on copies of the same 63 files: 2998 bytes changed in all, every one in a
+  recorded position field; ExifTool reads the new EXIF and XMP positions without warning;
+  the DJI XMP keeps its 98 attributes (read as OpenDroneMap does, with `xmltodict`), with
+  the new altitude and accuracies; `restore-images` gives files identical to the originals.
+- CGVD2013: the geoid undulations Azimut interpolates in both CGG2013a grids match PROJ 9.8.1
+  within 0.05 mm at 12 points across Canada.
 
 ## To confirm on real data
 
 - The same measurements on other firmware versions and on the Mavic 3E, Matrice 4 and
   Matrice 400 (`*_D.MRK` naming).
+- The position fields and XMP padding on other DJI models before writing into their images
+  (Azimut skips any file without them).
 - The meaning of the `*_F.JPG` file found once in a Mavic 3M flight (2592 × 1944, no exposure
   time, same `CaptureUUID` as the first capture).
 
