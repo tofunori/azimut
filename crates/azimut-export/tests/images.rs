@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use azimut_export::images::{
-    apply, patch_xmp, plan, plan_flight, rationals_deg, revert, FileEdit, XMP_FIELDS,
+    apply, copy_flight, patch_xmp, plan, plan_flight, rationals_deg, revert, FileEdit, XMP_FIELDS,
 };
 use azimut_io::layout::locate_fields;
 use azimut_io::scan::{scan, ScanOptions};
@@ -175,4 +175,52 @@ fn xmp_patching_keeps_length_and_refuses_element_form() {
                    </drone-dji:AbsoluteAltitude></x:xmpmeta>   <?xpacket end=\"w\"?>";
     let e = patch_xmp(element.as_bytes(), &[(field, "1".into())]).unwrap_err();
     assert!(e.contains("rewritten by another tool"), "{e}");
+}
+
+#[test]
+fn copies_carry_the_positions_and_originals_stay() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("flight");
+    let mut sol = flight(&src, 2, true, [0.5, 0.5, 0.5]);
+    // One capture without a position.
+    for f in &mut sol.exposures[1].files {
+        f.camera = None;
+    }
+    sol.exposures[1].camera = None;
+    let before: Vec<Vec<u8>> = sol
+        .exposures
+        .iter()
+        .flat_map(|e| &e.files)
+        .map(|f| std::fs::read(&f.path).unwrap())
+        .collect();
+
+    let dest = tmp.path().join("copies");
+    let r = copy_flight(&sol, &dest, false).unwrap();
+    assert_eq!(r.written.len(), 5);
+    assert_eq!(r.skipped.len(), 5, "unpositioned files are not copied");
+    assert_eq!(std::fs::read_dir(&dest).unwrap().count(), 5);
+    for f in &sol.exposures[0].files {
+        let (lat, ..) = gps(&dest.join(&f.file_name));
+        assert!((lat - f.camera.unwrap().lat_deg).abs() < 1e-9);
+    }
+    let after: Vec<Vec<u8>> = sol
+        .exposures
+        .iter()
+        .flat_map(|e| &e.files)
+        .map(|f| std::fs::read(&f.path).unwrap())
+        .collect();
+    assert_eq!(before, after, "originals untouched");
+
+    // A second run never overwrites; with unpositioned files they are copied unchanged.
+    let again = copy_flight(&sol, &dest, true).unwrap();
+    assert!(again.written.is_empty());
+    assert_eq!(std::fs::read_dir(&dest).unwrap().count(), 10);
+    assert!(again
+        .skipped
+        .iter()
+        .any(|(_, why)| why.contains("already exists")));
+    assert!(again
+        .skipped
+        .iter()
+        .any(|(_, why)| why.contains("aircraft's own position")));
 }

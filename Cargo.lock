@@ -90,6 +90,7 @@ dependencies = [
  "azimut-solve",
  "clap",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

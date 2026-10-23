@@ -401,6 +401,50 @@ pub fn revert(edit: &FileEdit) -> Result<bool, String> {
     }
 }
 
+/// Copy the images of a flight into `dest` and write each position into its copy; the
+/// originals are not touched. Files without a position are copied only when
+/// `include_unpositioned` is set (they then keep the aircraft's own position) and are listed
+/// in `skipped` either way. An existing file in `dest` is never overwritten.
+pub fn copy_flight(
+    sol: &FlightSolution,
+    dest: &Path,
+    include_unpositioned: bool,
+) -> Result<ImageWriteReport, String> {
+    std::fs::create_dir_all(dest).map_err(|e| format!("{}: {e}", dest.display()))?;
+    let mut report = ImageWriteReport::default();
+    for f in sol.exposures.iter().flat_map(|e| &e.files) {
+        if f.camera.is_none() && !include_unpositioned {
+            report
+                .skipped
+                .push((f.path.clone(), "no position: not copied".into()));
+            continue;
+        }
+        let to = dest.join(&f.file_name);
+        if to.exists() {
+            report
+                .skipped
+                .push((f.path.clone(), format!("{} already exists", to.display())));
+            continue;
+        }
+        if let Err(e) = std::fs::copy(&f.path, &to) {
+            report.skipped.push((f.path.clone(), format!("copy failed: {e}")));
+            continue;
+        }
+        let Some(c) = f.camera else {
+            report.skipped.push((
+                to,
+                "copied without a position: keeps the aircraft's own position".into(),
+            ));
+            continue;
+        };
+        match plan(&to, &c).and_then(|edit| apply(&edit).map(|()| edit)) {
+            Ok(edit) => report.written.push(edit),
+            Err(reason) => report.skipped.push((to, reason)),
+        }
+    }
+    Ok(report)
+}
+
 /// Plan the edits of every positioned file of a flight, without writing anything.
 pub fn plan_flight(sol: &FlightSolution) -> ImageWriteReport {
     let mut report = ImageWriteReport::default();

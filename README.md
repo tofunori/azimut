@@ -82,8 +82,10 @@ and writes:
 |---|---|
 | `<flight>_positions.csv` | One row per image file (JPEG and Mavic 3M bands): latitude, longitude, ellipsoidal height, 1-sigma E/N/U, fix status, satellites, frame. Imports into Metashape and Pix4D. `--roles Green` keeps one row per capture for a Metashape multi-camera master band. |
 | `<flight>_geo.txt` | OpenDroneMap `geo.txt` (EPSG:4326, ellipsoidal heights), with DJI gimbal yaw/pitch/roll and horizontal/vertical accuracy when the image carries gimbal angles. ODM uses those angles for radiometric calibration, so they are never set to zero. |
+| `<flight>_pix4dmatic.csv` | PIX4Dmatic image geolocation file: latitude, longitude, ellipsoidal height and 1-sigma horizontal and vertical accuracy per file, no angles (see below). `<flight>_pix4dmatic.txt` says how to import it. |
 | `<flight>_problems.csv` | Exposures without a position, or without an uncertainty, and why. |
 | `<flight>_solution.json` | Everything above plus the method (PPK file paths, or the RTK shift), statistics and file paths. |
+| `<flight>_report.html`, `_report.json` | Quality report: fix status, uncertainties (median and 95th percentile), base, scan findings, a plan view of the cameras, the exposures, the points to check and the files written. |
 
 When RTKLIB writes a covariance that is not positive definite (it prints 0 for a negative
 variance, seen on kinematic solutions), the uncertainty columns are left empty rather than
@@ -183,10 +185,34 @@ ITRF2008 and IGS20) it notes that the difference between realisations is not app
 Positions outside the grid get an empty height. `geo.txt` and the images keep ellipsoidal
 heights.
 
+### PIX4Dmatic
+
+PIX4D documents a geolocation import format for PIX4Dmatic; its project files are not
+documented, so Azimut does not write them. `<flight>_pix4dmatic.csv` uses the "geographic
+coordinates with accuracy values" layout: no header (one `#` comment line), then image,
+latitude, longitude, z, horizontal and vertical accuracy (1-sigma: sqrt(sE² + sN²) and sU).
+Without angles, PIX4Dmatic keeps the orientation read from the images. Create a project with
+the images (the originals, or the copies written by `--write-images copy`), then File >
+Import > Image geolocation and orientation, and choose the geographic system of the frame
+with ellipsoidal heights. With `--geoid`, `<flight>_pix4dmatic_orthometric.csv` holds the
+orthometric heights instead. Files without an uncertainty get no row, so PIX4Dmatic keeps the
+position read from them.
+
 ### Writing positions into the images
 
-`--write-images` (with `process` or `shift`) also writes each file's position into the file
-itself, in place:
+`--write-images in-place` or `--write-images copy` (with `process` or `shift`) also writes
+each file's position into the image: in the original file, or in a copy in `--images-dir`
+(default `<out>/images/<flight>`), leaving the original untouched. Copies take as much disk
+space as the flight; images without a position are not copied unless `--copy-unpositioned`
+is given. `--dry-run` shows what would be written. The same can be done later from the
+solution file, after looking at the report:
+
+```sh
+./target/release/azimut write-images results/<flight>_solution.json --mode copy --dry-run
+./target/release/azimut write-images results/<flight>_solution.json --mode copy
+```
+
+The fields written are:
 
 - EXIF GPS: `GPSLatitude`, `GPSLongitude` (to 1e-6 arc-second), `GPSAltitude` (to 0.1 mm)
   and their reference letters;
@@ -208,13 +234,54 @@ DJI XMP field, rewrites every field as an element. Before writing, Azimut checks
 XMP parses to the same fields apart from the written ones; a file without these fields, with
 its XMP already rewritten, or without an uncertainty for the position is skipped and listed.
 
-The original bytes of every change are saved first to `<flight>_image_edits.json`, and
+In place, the original bytes of every change are saved first to `<flight>_image_edits.json`, and
 
 ```sh
 ./target/release/azimut restore-images results/<flight>_image_edits.json
 ```
 
 puts them back (a file that changed since is left alone). Keep a copy of the SD card anyway.
+
+### Running Azimut from an agent (MCP)
+
+`azimut mcp` is a [Model Context Protocol](https://modelcontextprotocol.io/) server on stdio,
+so that an agent such as Claude Code or Codex can run Azimut for a user, in the user's
+project folder. Add it once per project:
+
+```sh
+claude mcp add azimut -- azimut mcp          # Claude Code
+codex mcp add azimut -- azimut mcp           # Codex
+```
+
+or share a `.mcp.json` in the project (set `AZIMUT_RTKLIB_DIR` when RTKLIB-EX is not on the
+PATH):
+
+```json
+{ "mcpServers": { "azimut": { "command": "azimut", "args": ["mcp"],
+  "env": { "AZIMUT_RTKLIB_DIR": "/path/to/rtklib/bin" } } } }
+```
+
+Then ask, for example: "Do the PPK of the flights in `field/2024-08-09` with the base in
+`base/`, coordinates from `base/12345678.sum`, with CGVD2013 heights."
+
+| Tool | Does |
+|---|---|
+| `scan_folder` | Inventory and diagnosis (read only). |
+| `read_ppp_summary` | Position, systems, uncertainty and point of a CSRS-PPP summary (read only). |
+| `process_ppk` | PPK; writes the outputs and report, returns the report summary. Images untouched. |
+| `shift_rtk` | RTK correction; same outputs. |
+| `write_images` | Positions into the images, in place or into copies; dry run unless `confirm: true`. |
+| `restore_images` | Undo an in-place write. |
+| `read_report` | Full report of a flight. |
+
+The server never takes a decision that is the user's. When the base files, the base
+coordinates, their frame, the shift, the image mode or the consent to write images are
+missing, the tool does nothing and returns `status: "needs_decision"` (or
+`"needs_confirmation"` after a dry run) with the questions for the agent to ask. Coordinates
+are never accepted without a frame. The server also gives the agent working instructions and
+a `ppk_workflow` prompt (step by step, asking at each decision). Long runs send progress
+notifications when the client asks for them; if the client times out tool calls, raise its
+limit (Claude Code: `MCP_TOOL_TIMEOUT`).
 
 ### RINEX checks
 
@@ -281,9 +348,10 @@ manuals. Tested so far on synthetic data only.
    summaries as base position (`--base-ppp`, `--to-ppp`), and `shift` for RTK flights.
 3. **`azimut-geo`** (this release: CGVD2013 from PROJ geoid grids, with a frame check):
    NAD83(CSRS) with epoch, refusal of approximate transformations.
-4. **`azimut-export`** (this release: CSV, ODM `geo.txt` with angles and accuracy, in-place
-   writing into the images with undo): Pix4D-specific CSV.
-5. **`azimut-report`**: quality report (fix rate, uncertainty map, base distance).
+4. **`azimut-export`** (this release: CSV, ODM `geo.txt` with angles and accuracy, PIX4Dmatic
+   geolocation file, writing into the images in place with undo or into copies, quality
+   report in JSON and HTML).
+5. **Agents** (this release: `azimut mcp`).
 6. **App**: native desktop interface (GPUI).
 7. **Validation**: checkpoints (ASPRS Ed. 2), comparison with other tools, open test dataset.
 
@@ -312,6 +380,8 @@ On one Mavic 3M flight (firmware 11.08.01.41, August 2024, 13 captures and the f
   recorded position field; ExifTool reads the new EXIF and XMP positions without warning;
   the DJI XMP keeps its 98 attributes (read as OpenDroneMap does, with `xmltodict`), with
   the new altitude and accuracies; `restore-images` gives files identical to the originals.
+- Through `azimut mcp`, a PPK of the same flight (86 s) sends progress notifications and
+  returns the report summary; `write_images` stops at a dry run until confirmed.
 - CGVD2013: the geoid undulations Azimut interpolates in both CGG2013a grids match PROJ 9.8.1
   within 0.05 mm at 12 points across Canada.
 

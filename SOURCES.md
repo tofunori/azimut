@@ -117,6 +117,14 @@ Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](
 | OpenDroneMap reads DJI XMP fields only as attributes (`@drone-dji:SensorGain`, `ExposureTime`, `CaptureUUID`, `FlightYawDegree`...), takes the altitude from `@drone-dji:AbsoluteAltitude` over EXIF and the accuracy from `RtkStdLon/Lat/Hgt` | `images.rs` (attribute form kept; `AbsoluteAltitude` and `RtkStd*` written) | [OpenDroneMap photo.py](https://raw.githubusercontent.com/OpenDroneMap/ODM/master/opendm/photo.py) (`get_xmp_tag`, `parse_exif_values`) |
 | ExifTool 12.76, asked to write one DJI XMP field, rewrites every field of the packet as an element, which OpenDroneMap then no longer reads; it also drops empty attributes | `images.rs` (in-place writing instead of ExifTool) | Own measurement on copies of the Mavic 3M files |
 
+## PIX4Dmatic and MCP
+
+| Rule | Where | Source |
+|---|---|---|
+| PIX4Dmatic image geolocation import: `.csv`/`.txt`, comma-separated, no header (a `#` comment allowed on the first line); "geographic coordinates with accuracy values": image, coordinate 1, coordinate 2 (in the axis order of the chosen system, latitude first for geographic EPSG systems), z, accuracy horizontal, accuracy vertical (m); orientation columns optional | `azimut-export` (`pix4dmatic_csv`) | [PIX4Dmatic: How to import and export image geolocation and orientation files](https://support.pix4d.com/hc/en-us/articles/360056389172) |
+| PIX4Dmatic project files (`.p4m`) have no public format description, so Azimut does not write them | design rule | [PIX4Dmatic outputs](https://support.pix4d.com/hc/en-us/articles/360044950312) (lists `.p4m` without a format) |
+| MCP: JSON-RPC 2.0 over stdio, one message per line, logs on stderr; `initialize` (version negotiation, `instructions`), `tools/list`, `tools/call` (`content`, `structuredContent`, `isError`), `prompts/list`/`get`, `ping`, `notifications/progress` with the caller's `progressToken` | `azimut-cli` `mcp.rs` | [Model Context Protocol specification 2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18) |
+
 ## Outputs
 
 | Rule | Where | Source |
