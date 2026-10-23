@@ -1,6 +1,6 @@
 # Architecture
 
-Azimut is a Rust workspace of five crates. Each one can be used as a library; the command-line
+Azimut is a Rust workspace of six crates. Each one can be used as a library; the command-line
 program and the MCP server only orchestrate them.
 
 ```mermaid
@@ -11,12 +11,14 @@ flowchart LR
         IO["azimut-io<br/>headers, MRK, RINEX,<br/>pairing, diagnosis"] --> SOLVE
         SOLVE["azimut-solve<br/>RTKLIB-EX, trajectory,<br/>lever arm, RTK shift"] --> EXPORT
         GEO["azimut-geo<br/>geoid grids (CGVD2013)"] --> EXPORT
+        CSRS["azimut-csrs<br/>CSRS-PPP submission"] --> SOLVE
         EXPORT["azimut-export<br/>CSV, geo.txt, PIX4Dmatic,<br/>report, image writing"]
         CLI["azimut-cli<br/>command line, MCP server"]
     end
     RTK[("RTKLIB-EX<br/>convbin, rnx2rtkp")] <--> SOLVE
+    NRCAN[("NRCan CSRS-PPP<br/>web service")] <--> CSRS
     EXPORT --> OUT["Metashape, PIX4D,<br/>OpenDroneMap, report"]
-    CLI -.drives.-> IO & SOLVE & EXPORT
+    CLI -.drives.-> IO & CSRS & SOLVE & EXPORT
 ```
 
 | Crate | Role |
@@ -24,6 +26,7 @@ flowchart LR
 | `azimut-io` | Header-only readers (JPEG APP1, TIFF tag 700, EXIF GPS layout), DJI MRK, RINEX summaries, CSRS-PPP summaries, Mavic 3M capture grouping, time pairing, folder diagnosis. Never reads pixels. |
 | `azimut-solve` | RTKLIB-EX `convbin` and `rnx2rtkp`, RTKLIB solutions with full covariance, antenna interpolation to each file's exposure time, MRK lever arm, RTK shift. |
 | `azimut-geo` | Geoid grids in the PROJ GeoTIFF format, orthometric heights, frame check. |
+| `azimut-csrs` | Submission of the base RINEX to NRCan CSRS-PPP, wait and download of the results; the only crate that touches the network, and the only place that knows the service's undocumented interface. |
 | `azimut-export` | Positions CSV, OpenDroneMap `geo.txt`, PIX4Dmatic geolocation, problems list, quality report (JSON and HTML), in-place or copy writing into images with undo. |
 | `azimut-cli` | The `azimut` command and the `azimut mcp` server. |
 

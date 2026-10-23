@@ -1,12 +1,15 @@
 //! `azimut` command-line tool.
 
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 mod mcp;
 
 use anyhow::{Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 
+use azimut_csrs::{Client as CsrsClient, ProcessType, RefSystem, Request as CsrsRequest, WaitOptions};
 use azimut_export::images::{self, FileEdit};
 use azimut_export::report::{FlightReport, ImagesInfo, Lang};
 use azimut_export::{odm_geo_txt, pix4dmatic_csv, positions_csv_with_heights, problems_csv, RowFilter};
@@ -47,6 +50,7 @@ enum Command {
         base: Vec<PathBuf>,
     },
     /// Scan, then run PPK (RTKLIB-EX) and write camera positions for every flight.
+    #[command(group(ArgGroup::new("ppp_source").args(["base_ppp", "submit_ppp"])))]
     Process {
         /// Folder to process: an SD card copy, a mission folder or a whole campaign.
         dir: PathBuf,
@@ -76,8 +80,14 @@ enum Command {
             conflicts_with_all = ["base_llh", "antenna_height", "antenna_type"]
         )]
         base_ppp: Option<PathBuf>,
+        /// Submit the base RINEX to CSRS-PPP, wait for the result and use it as --base-ppp
+        /// would. Needs --email; the results are kept in <out>/csrs_ppp.
+        #[arg(long, conflicts_with_all = ["base_ppp", "base_llh", "antenna_height", "antenna_type"])]
+        submit_ppp: bool,
+        #[command(flatten)]
+        csrs: CsrsArgs,
         /// Reference system to take from the CSRS-PPP summary when it holds several.
-        #[arg(long, value_name = "SYSTEM", requires = "base_ppp")]
+        #[arg(long, value_name = "SYSTEM", requires = "ppp_source")]
         ppp_system: Option<String>,
         /// ANTEX file with antenna phase-centre models (e.g. igs20.atx).
         #[arg(long)]
@@ -164,6 +174,22 @@ enum Command {
         /// Pairing tolerance between MRK and image times, seconds.
         #[arg(long, default_value_t = DEFAULT_TOLERANCE_S)]
         tolerance: f64,
+    },
+    /// Submit a base-station RINEX to NRCan CSRS-PPP, wait for the result and save it
+    /// (summary, positions, PDF). Give the summary to `process --base-ppp` or `shift --to-ppp`.
+    #[command(group(ArgGroup::new("job").required(true).args(["rinex", "resume"])))]
+    Ppp {
+        /// Base-station RINEX observation file, as recorded (compressed files are accepted).
+        rinex: Option<PathBuf>,
+        #[command(flatten)]
+        csrs: CsrsArgs,
+        /// Fetch the results of an earlier submission (key printed when it was submitted)
+        /// instead of submitting again.
+        #[arg(long, value_name = "KEY")]
+        resume: Option<String>,
+        /// Output folder.
+        #[arg(long, default_value = "azimut_out/csrs_ppp")]
+        out: PathBuf,
     },
     /// Write the positions of a computed flight (<flight>_solution.json from `process` or
     /// `shift`) into its images, in place or into copies. Use --dry-run first to see what
@@ -255,6 +281,8 @@ fn main() -> Result<()> {
             antenna_height,
             antenna_type,
             base_ppp,
+            submit_ppp,
+            csrs,
             ppp_system,
             antex,
             rtklib,
@@ -279,22 +307,29 @@ fn main() -> Result<()> {
             print_report(&report);
             let rtk = Rtklib::locate(rtklib.as_deref())?;
 
-            let ppp = match &base_ppp {
-                Some(path) => Some(read_ppp(path)?),
-                None => None,
+            let (ppp, ppp_path, ppp_system) = if submit_ppp {
+                let rinex = submitted_base(&report)?;
+                let r = csrs_fetch(Some(&rinex), None, &csrs, &out.join("csrs_ppp"))?;
+                let system = ppp_system.or_else(|| system_of(&r.summary, csrs.sysref));
+                (Some(r.summary), Some(r.summary_path), system)
+            } else {
+                match &base_ppp {
+                    Some(path) => (Some(read_ppp(path)?), Some(path.clone()), ppp_system),
+                    None => (None, None, ppp_system),
+                }
             };
-            let base_setup = match &ppp {
-                Some(sum) => {
+            let base_setup = match (&ppp, &ppp_path) {
+                (Some(sum), Some(path)) => {
                     let (mut setup, point) = BaseSetup::from_ppp(sum, ppp_system.as_deref(), antex.is_some())
                         .map_err(anyhow::Error::msg)
-                        .with_context(|| format!("--base-ppp {}", base_ppp.as_ref().unwrap().display()))?;
+                        .with_context(|| format!("CSRS-PPP summary {}", path.display()))?;
                     print_ppp(sum, ppp_system.as_deref(), &point)?;
                     if let Some(f) = frame {
                         setup.frame = f;
                     }
                     setup
                 }
-                None => {
+                _ => {
                     let position = match &base_llh {
                         Some(t) => {
                             let [lat_deg, lon_deg, h_ell_m] = triplet(t, "--base-llh", "LAT,LON,H")?;
@@ -487,6 +522,33 @@ fn main() -> Result<()> {
             }
             std::process::exit(if failures > 0 { 2 } else { 0 });
         }
+        Command::Ppp {
+            rinex,
+            csrs,
+            resume,
+            out,
+        } => {
+            let r = csrs_fetch(rinex.as_deref(), resume.as_deref(), &csrs, &out)?;
+            let system = system_of(&r.summary, csrs.sysref);
+            let (_, point) =
+                BaseSetup::from_ppp(&r.summary, system.as_deref(), true).map_err(anyhow::Error::msg)?;
+            print_ppp(&r.summary, system.as_deref(), &point)?;
+            if r.summary.positions.len() > 1 {
+                let all: Vec<&str> = r.summary.positions.iter().map(|p| p.system.as_str()).collect();
+                println!(
+                    "   The summary also holds {}; choose with --ppp-system.",
+                    all.join(", ")
+                );
+            }
+            println!(
+                "\nNext: azimut process <flights> --base {} --base-ppp {}",
+                rinex
+                    .as_deref()
+                    .map_or("<base RINEX>".into(), |p| p.display().to_string()),
+                r.summary_path.display()
+            );
+            Ok(())
+        }
         Command::WriteImages {
             solution,
             mode,
@@ -586,6 +648,157 @@ fn sibling_navs(obs: &Path) -> Vec<PathBuf> {
 
 fn read_ppp(path: &Path) -> Result<PppSummary> {
     csrs_ppp::read(path).with_context(|| format!("reading CSRS-PPP summary {}", path.display()))
+}
+
+/// CSRS-PPP submission options, shared by `ppp` and `process --submit-ppp`.
+#[derive(clap::Args, Clone)]
+struct CsrsArgs {
+    /// E-mail of your CSRS-PPP account (NRCan), for submissions.
+    #[arg(long, env = "AZIMUT_CSRS_EMAIL", value_name = "ADDRESS")]
+    email: Option<String>,
+    /// Reference system CSRS-PPP computes in: ITRF at the epoch of the observations, or
+    /// NAD83(CSRS) at the current epoch with CGVD2013 heights.
+    #[arg(long, value_enum, default_value = "itrf")]
+    sysref: Sysref,
+    /// CSRS-PPP processing mode of the base RINEX.
+    #[arg(long, value_enum, default_value = "static")]
+    ppp_mode: PppMode,
+    /// Longest wait for the CSRS-PPP result, minutes; the tracking key is printed to fetch
+    /// it later (`azimut ppp --resume`).
+    #[arg(long, default_value_t = 15.0, value_name = "MIN")]
+    ppp_timeout: f64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum Sysref {
+    Itrf,
+    Nad83,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum PppMode {
+    Static,
+    Kinematic,
+}
+
+/// Submit `rinex` to CSRS-PPP (or take the earlier submission `resume`), wait, then write
+/// the results archive and its files into `out`.
+fn csrs_fetch(
+    rinex: Option<&Path>,
+    resume: Option<&str>,
+    args: &CsrsArgs,
+    out: &Path,
+) -> Result<azimut_csrs::Results> {
+    anyhow::ensure!(
+        args.ppp_timeout > 0.0 && args.ppp_timeout <= 24.0 * 60.0,
+        "--ppp-timeout must be between 0 and 1440 minutes"
+    );
+    let client = CsrsClient::new()?;
+    let key = match (resume, rinex) {
+        (Some(key), _) => key.trim().to_string(),
+        (None, Some(rinex)) => {
+            let email = args.email.as_deref().context(
+                "CSRS-PPP needs the e-mail of your account: give --email or set AZIMUT_CSRS_EMAIL",
+            )?;
+            let req = CsrsRequest {
+                rinex,
+                email,
+                process_type: match args.ppp_mode {
+                    PppMode::Static => ProcessType::Static,
+                    PppMode::Kinematic => ProcessType::Kinematic,
+                },
+                system: match args.sysref {
+                    Sysref::Itrf => RefSystem::Itrf,
+                    Sysref::Nad83 => RefSystem::Nad83,
+                },
+            };
+            println!("\nSubmitting {} to CSRS-PPP...", rinex.display());
+            let key = client
+                .submit(&req)
+                .with_context(|| format!("submitting {} to CSRS-PPP", rinex.display()))?;
+            println!("   tracking key: {key}");
+            key
+        }
+        (None, None) => anyhow::bail!("give a RINEX file to submit, or --resume KEY"),
+    };
+    let opts = WaitOptions {
+        timeout: Duration::from_secs_f64(args.ppp_timeout * 60.0),
+        ..WaitOptions::default()
+    };
+    print!("   processing");
+    std::io::stdout().flush().ok();
+    let start = std::time::Instant::now();
+    let wait = client.wait(&key, &opts, |_| {
+        print!(".");
+        std::io::stdout().flush().ok();
+    });
+    println!();
+    if let Err(e) = wait {
+        // The submission may still finish: say how to fetch it.
+        if matches!(
+            e,
+            azimut_csrs::Error::Timeout { .. } | azimut_csrs::Error::Http { .. }
+        ) {
+            anyhow::bail!(
+                "{e}\n   fetch them with: azimut ppp --resume {key} --out {}",
+                out.display()
+            );
+        }
+        return Err(e.into());
+    }
+    println!("   done after {} s", start.elapsed().as_secs());
+    let archive = client.download(&key)?;
+    let r = azimut_csrs::extract(&key, &archive, out)?;
+    let stem = r
+        .summary_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "results".into());
+    let zip = out.join(format!("{stem}_csrs_ppp.zip"));
+    std::fs::write(&zip, &archive).with_context(|| format!("writing {}", zip.display()))?;
+    println!(
+        "   results in {} ({} files and the archive)",
+        out.display(),
+        r.files.len()
+    );
+    Ok(r)
+}
+
+/// The summary system matching the reference system asked for, when it holds several.
+fn system_of(sum: &PppSummary, sysref: Sysref) -> Option<String> {
+    if sum.positions.len() < 2 {
+        return None;
+    }
+    let nad83 = |s: &str| s.to_ascii_uppercase().contains("NAD83");
+    sum.positions
+        .iter()
+        .find(|p| nad83(&p.system) == (sysref == Sysref::Nad83))
+        .map(|p| p.system.clone())
+}
+
+/// The one base RINEX the flights use, for `--submit-ppp`.
+fn submitted_base(report: &ScanReport) -> Result<PathBuf> {
+    let mut bases: Vec<&Path> = report
+        .flights
+        .iter()
+        .filter_map(|f| f.base.as_ref())
+        .map(|b| report.rinex[b.rinex].path.as_path())
+        .collect();
+    bases.sort();
+    bases.dedup();
+    match bases.as_slice() {
+        [one] => Ok(one.to_path_buf()),
+        [] => anyhow::bail!("--submit-ppp: no base RINEX covers the flights (use --base)"),
+        many => anyhow::bail!(
+            "--submit-ppp: the flights use {} base RINEX files ({}); submit each with `azimut ppp` \
+             and process each group of flights with its own --base and --base-ppp",
+            many.len(),
+            many.iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    }
 }
 
 /// Print what a CSRS-PPP summary gives, and what its coordinates refer to.

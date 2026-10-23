@@ -71,7 +71,7 @@ azimut process flights/ --base base.24o --base-ppp base.sum --out results  # PPK
 | 🔎 **Diagnose first** | Whole SD cards in seconds, from image headers only: missing bands, MRK pairing, base coverage. |
 | 🛰️ **PPK** | RTKLIB-EX against your base, each file positioned at its own exposure time. |
 | 🌈 **Mavic 3M** | Five files per capture; the bands, exposed 26 ms after the RGB image, get their own position. |
-| 📍 **CSRS-PPP & RTK** | Base position from NRCan CSRS-PPP; RTK flights corrected by the base shift. |
+| 📍 **CSRS-PPP & RTK** | Base position from NRCan CSRS-PPP, submitted by Azimut or from a summary; RTK flights corrected by the base shift. |
 | 📏 **Heights** | Ellipsoidal or CGVD2013, with a check that the geoid matches the frame. |
 | 📤 **Outputs** | PIX4Dmatic, Metashape, OpenDroneMap, CSV, and an HTML/JSON report. |
 | 🖼️ **Into the images** | EXIF + DJI XMP positions, in place (undoable) or into copies, radiometry untouched. |

@@ -36,6 +36,12 @@ Il faut :
   [CSRS-PPP](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/tools-outils/ppp.php) (RNCan) pour
   ce même RINEX.
 
+Azimut peut aussi soumettre lui-même le RINEX de la base à CSRS-PPP et attendre le résultat
+(environ une minute) : donner le courriel du compte CSRS-PPP une fois pour toutes dans la
+variable `AZIMUT_CSRS_EMAIL`, puis remplacer `--base-ppp …` par `--submit-ppp` à l'étape 2.
+Le rapport de CSRS-PPP (`.sum`, `.pdf`…) est gardé dans `D:\resultats\csrs_ppp`. Pour
+seulement obtenir la position de la base : `azimut ppp D:\base\base.24o --out D:\base\ppp`.
+
 ```sh
 # 1. Diagnostic : rien n'est modifié, quelques secondes
 azimut scan D:\terrain\2026-08-09 --base D:\base\base.24o

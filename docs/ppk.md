@@ -48,6 +48,24 @@ azimut process /path/to/campaign --rtklib /path/to/rtklib/bin \
     --base /path/to/base.26o --base-ppp /path/to/12345678.sum --antex igs20.atx --out results
 ```
 
+Azimut can also submit the RINEX itself, with the e-mail of your CSRS-PPP account
+(`--email` or the `AZIMUT_CSRS_EMAIL` variable). `azimut ppp` submits, waits (every 10 s, at
+most `--ppp-timeout` minutes, 15 by default) and saves the results archive and its files
+(summary, positions, PDF report); `process --submit-ppp` does the same with the base RINEX of
+the flights, keeps the results in `<out>/csrs_ppp` and goes on as with `--base-ppp`:
+
+```sh
+export AZIMUT_CSRS_EMAIL=you@example.org
+azimut ppp /path/to/base.26o --out results/csrs_ppp       # ITRF by default; --sysref nad83
+azimut process /path/to/campaign --base /path/to/base.26o --submit-ppp --antex igs20.atx --out results
+```
+
+The tracking key is printed at submission. If the wait times out, or the connection drops,
+`azimut ppp --resume <key>` fetches the results later. CSRS-PPP has no documented public API:
+Azimut uses the interface of NRCan's own `csrs_ppp_auto.py` script, kept in one crate
+(`azimut-csrs`) so it can be fixed quickly if NRCan changes it. Proxies are taken from
+`HTTPS_PROXY` and `NO_PROXY`.
+
 Azimut reads the position, its reference system and epoch (written into every output row),
 the 95 % uncertainties and the antenna records, and sets up the base so that RTKLIB uses the
 point CSRS-PPP estimated:
