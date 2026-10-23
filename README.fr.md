@@ -23,7 +23,7 @@ référence et hauteurs CGVD2013, prêtes pour PIX4D, Metashape et OpenDroneMap.
 conçu pour la recherche au GlacioLab (UQTR).
 
 <p align="center">
-  <img src="docs/img/pipeline-fr.svg" alt="Carte SD → diagnostic → PPK → positions → vos logiciels" width="100%">
+  <img src="docs/img/pipeline-fr.svg" alt="Carte SD → diagnostic → PPK (base via CSRS-PPP) → positions → vos logiciels" width="100%">
 </p>
 
 ## Installer

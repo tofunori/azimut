@@ -15,8 +15,8 @@
 <rect x="458" y="18" width="184" height="174" rx="16" class="card hl"/>
 <g transform="translate(550 72)"><circle r="15" class="ic"/><circle r="7" class="ic"/><circle r="2.5" class="dot"/><path d="M0 -21 v6 M0 15 v6 M-21 0 h6 M15 0 h6" class="ic"/></g>
 <text x="550" y="132" text-anchor="middle" class="t">PPK</text>
-<text x="550" y="158" text-anchor="middle" class="s">RTKLIB-EX +</text>
-<text x="550" y="177" text-anchor="middle" class="s">base station</text>
+<text x="550" y="158" text-anchor="middle" class="s">RTKLIB-EX + base</text>
+<text x="550" y="177" text-anchor="middle" class="s">via CSRS-PPP</text>
 <path d="M646 105 H668" class="ar"/><path d="M674 105 l-8 -5 v10 z" class="ah"/>
 <rect x="678" y="18" width="184" height="174" rx="16" class="card"/>
 <g transform="translate(770 72)"><path d="M0 18 C-10 6 -14 0 -14 -6 a14 14 0 0 1 28 0 c0 6 -4 12 -14 24 z" class="ic"/><circle cy="-6" r="5" class="dot"/></g>
