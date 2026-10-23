@@ -25,7 +25,7 @@ CGVD2013 heights, ready for PIX4D, Metashape and OpenDroneMap. Open source, buil
 at the GlacioLab (UQTR).
 
 <p align="center">
-  <img src="docs/img/pipeline.svg" alt="SD card → diagnose → PPK → positions → your software" width="100%">
+  <img src="docs/img/pipeline.svg" alt="SD card → diagnose → PPK (base via CSRS-PPP) → positions → your software" width="100%">
 </p>
 
 ## Install
