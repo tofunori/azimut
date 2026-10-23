@@ -787,8 +787,14 @@ impl FlightReport {
         let scale = ((w / 2.0 - pad) / span).min((h / 2.0 - pad) / span);
         let px = |x: f64, y: f64| (w / 2.0 + x * scale, h / 2.0 - y * scale);
 
+        // Smaller marks with a thinner ring when there are many, so they stay apart.
+        let (mark_r, dense) = match pts.len() {
+            0..=60 => (5.0, ""),
+            61..=200 => (3.5, " dense"),
+            _ => (2.5, " dense"),
+        };
         let mut s = format!(
-            "<svg viewBox=\"0 0 {w} {h}\" role=\"img\" aria-label=\"{}\" class=\"map\">\
+            "<svg viewBox=\"0 0 {w} {h}\" role=\"img\" aria-label=\"{}\" class=\"map{dense}\">\
              <rect class=\"plot\" x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\" rx=\"8\"/>",
             t.map_title
         );
@@ -831,7 +837,7 @@ impl FlightReport {
                 s,
                 "<g class=\"mark {}\"><title>{tip}</title>{}</g>",
                 class_of(q),
-                shape(q, cx, cy)
+                shape(q, cx, cy, mark_r)
             );
         }
         // Scale bar: a round length near a quarter of the width.
@@ -987,7 +993,10 @@ impl FlightReport {
                 .map(|(i, p)| format!("{:.1},{:.1}", x(i), y(p.1[k])))
                 .collect();
             let _ = write!(s, "<polyline class=\"s{k}\" points=\"{}\"/>", line.join(" "));
-            for (i, p) in pts.iter().enumerate() {
+            // A marker per capture only while they stay apart; else the last one, which
+            // anchors the end label (the table holds every value).
+            let first = if n <= 60 { 0 } else { n - 1 };
+            for (i, p) in pts.iter().enumerate().skip(first) {
                 let _ = write!(
                     s,
                     "<circle class=\"s{k}\" cx=\"{:.1}\" cy=\"{:.1}\" r=\"4\"><title>{} {} &middot; &sigma; {} {}</title></circle>",
@@ -1293,22 +1302,24 @@ fn status_word<'a>(q: &str, t: &'a Text) -> &'a str {
 }
 
 /// Status mark: circle (fixed), triangle (float), square (other), so shape carries the
-/// status as well as colour.
-fn shape(q: &str, x: f64, y: f64) -> String {
+/// status as well as colour. `r` is the half size (5 for a few marks, less for many).
+fn shape(q: &str, x: f64, y: f64, r: f64) -> String {
     match class_of(q) {
-        "fixed" => format!("<circle cx=\"{x:.1}\" cy=\"{y:.1}\" r=\"5\"/>"),
+        "fixed" => format!("<circle cx=\"{x:.1}\" cy=\"{y:.1}\" r=\"{r}\"/>"),
         "float" => format!(
             "<path d=\"M{x:.1},{:.1} L{:.1},{:.1} L{:.1},{:.1} Z\"/>",
-            y - 6.0,
-            x + 6.0,
-            y + 4.5,
-            x - 6.0,
-            y + 4.5
+            y - 1.2 * r,
+            x + 1.2 * r,
+            y + 0.9 * r,
+            x - 1.2 * r,
+            y + 0.9 * r
         ),
         _ => format!(
-            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"10\"/>",
-            x - 5.0,
-            y - 5.0
+            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\"/>",
+            x - r,
+            y - r,
+            2.0 * r,
+            2.0 * r
         ),
     }
 }
@@ -1317,7 +1328,7 @@ fn legend_shape(q: &str) -> String {
     format!(
         "<svg class=\"key-shape {}\" viewBox=\"0 0 14 14\" aria-hidden=\"true\">{}</svg>",
         class_of(q),
-        shape(q, 7.0, 7.0)
+        shape(q, 7.0, 7.0, 5.0)
     )
 }
 
@@ -1438,7 +1449,7 @@ border-radius:999px;padding:3px 10px;font-size:13px;color:var(--ink2)}\
 figure{margin:0}figcaption{display:flex;flex-direction:column;margin-bottom:8px}figcaption span{color:var(--muted);font-size:12.5px}\
 svg.map,svg.chart{width:100%;height:auto;display:block}.plot{fill:var(--page);stroke:var(--grid)}\
 .track{fill:none;stroke:var(--axis);stroke-width:1.5;stroke-linejoin:round}\
-.mark circle,.mark path,.mark rect{stroke:var(--surface);stroke-width:2}\
+.mark circle,.mark path,.mark rect{stroke:var(--surface);stroke-width:2}.dense .mark>*:not(title){stroke-width:1}\
 .mark.fixed>*:not(title),.key-shape.fixed>*{fill:var(--good)}.mark.float>*:not(title),.key-shape.float>*{fill:var(--warn)}\
 .mark.other>*:not(title),.key-shape.other>*{fill:var(--crit)}.mark:hover>*:not(title){stroke:var(--ink)}\
 .scale line{stroke:var(--ink2);stroke-width:2}.scale text,.north text,.base text,.tick,.end{fill:var(--ink2);font-size:12px}\

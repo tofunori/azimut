@@ -408,6 +408,28 @@ mod tests {
     }
 
     #[test]
+    fn report_stays_readable_with_many_captures() {
+        use crate::report::FlightReport;
+        let mut sol = sample();
+        let template = sol.exposures[0].clone();
+        sol.exposures = (0..300)
+            .map(|i| {
+                let mut e = template.clone();
+                e.index = Some(i + 1);
+                e.gps_s = e.gps_s.map(|g| g + i as f64 * 2.0);
+                e
+            })
+            .collect();
+        let html = FlightReport::build(&sol, None, None, None).html();
+        assert!(html.contains("class=\"map dense\""), "smaller marks");
+        assert_eq!(
+            html.matches("<circle class=\"s").count(),
+            3,
+            "one end marker per sigma series, not one per capture"
+        );
+    }
+
+    #[test]
     fn problems_are_listed() {
         let p = problems_csv(&sample());
         assert!(p.contains("2,B_D.JPG,exposure outside the PPK trajectory"));
