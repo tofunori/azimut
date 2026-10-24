@@ -34,7 +34,8 @@ pub enum RowFilter {
     /// Every image file.
     #[default]
     All,
-    /// Only files whose role is listed (`jpeg`, `Green`, `Red`, `RedEdge`, `NIR`, `tiff`).
+    /// Only files whose role is listed (`jpeg`, `Green`, `Red`, `RedEdge`, `NIR`, `ms_jpeg`,
+    /// `tiff`).
     /// `--roles Green` gives one row per capture for a Metashape multi-camera master band.
     Roles(Vec<String>),
 }

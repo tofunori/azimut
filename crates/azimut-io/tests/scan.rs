@@ -35,6 +35,61 @@ fn complete_m3m_flight_pairs_every_capture() {
 }
 
 #[test]
+fn multispectral_camera_jpeg_keeps_the_capture_complete() {
+    // Mavic 3M, 6 October 2026: with some camera settings each trigger also writes
+    // `_F.JPG`, a JPEG from the multispectral camera without `UTCAtExposure`.
+    let tmp = tempfile::tempdir().unwrap();
+    let spec = SyntheticFlight {
+        ms_jpeg: true,
+        band_delay_s: 0.026,
+        ..Default::default()
+    };
+    write_flight(tmp.path(), &spec).unwrap();
+    let f = &scan(tmp.path(), &ScanOptions::default()).flights[0];
+    assert_eq!(f.photos.len(), 60);
+    assert_eq!(f.captures.len(), 10);
+    let ms: Vec<_> = f.photos.iter().filter(|p| p.kind == ImageKind::MsJpeg).collect();
+    assert_eq!(ms.len(), 10);
+    assert!(ms.iter().all(|p| p.exposure_clock_s.is_none()));
+    for c in &f.captures {
+        assert!(c.is_complete_m3m(), "{c:?}");
+        assert_eq!((c.jpegs, c.ms_jpegs), (1, 1));
+        let delay = c.band_clock_s.unwrap() - c.exposure_clock_s.unwrap();
+        assert!((delay - 0.026).abs() < 2e-6, "{delay}");
+    }
+    let c = codes(f);
+    assert!(c.contains(&"m3m_groups") && c.contains(&"m3m_ms_jpeg"), "{c:?}");
+    assert_eq!(f.matching.pairs.len(), 10);
+}
+
+#[test]
+fn f_suffix_counts_only_without_image_source() {
+    let tmp = tempfile::tempdir().unwrap();
+    let write = |name: &str, xmp: &str| {
+        let path = tmp.path().join(name);
+        std::fs::write(&path, jpeg_with_xmp(xmp)).unwrap();
+        read_photo(&path).kind
+    };
+    let packet = |attrs: &str| {
+        format!(
+            "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\
+             <rdf:Description xmlns:drone-dji=\"http://www.dji.com/drone-dji/1.0/\" {attrs}/></rdf:RDF></x:xmpmeta>"
+        )
+    };
+    let no_source = packet(r#"drone-dji:GimbalYawDegree="+0.50""#);
+    let rgb = packet(r#"drone-dji:ImageSource="RGB_CAMERA""#);
+    assert_eq!(
+        write("DJI_20261006111350_0001_F.JPG", &no_source),
+        ImageKind::MsJpeg
+    );
+    assert_eq!(write("DJI_20261006111350_0002_F.JPG", &rgb), ImageKind::Jpeg);
+    assert_eq!(
+        write("DJI_20261006111350_0003_D.JPG", &no_source),
+        ImageKind::Jpeg
+    );
+}
+
+#[test]
 fn utc_clock_is_detected() {
     let tmp = tempfile::tempdir().unwrap();
     let spec = SyntheticFlight {

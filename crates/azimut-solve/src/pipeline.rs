@@ -31,7 +31,8 @@ pub struct ProcessOptions {
 pub struct FileRef {
     pub file_name: String,
     pub path: PathBuf,
-    /// `jpeg`, `tiff`, or the band name (`Green`, `Red`, `RedEdge`, `NIR`).
+    /// `jpeg`, `tiff`, `ms_jpeg` (multispectral camera JPEG), or the band name (`Green`,
+    /// `Red`, `RedEdge`, `NIR`).
     pub role: String,
     /// Gimbal yaw, pitch, roll from the image XMP, degrees.
     pub gimbal_ypr_deg: Option<[f64; 3]>,
@@ -106,13 +107,18 @@ pub(crate) fn exposure_files(flight: &Flight, capture: usize) -> Vec<FileRef> {
         .iter()
         .map(|&i| {
             let p = &flight.photos[i];
+            // The multispectral camera's JPEG has no exposure time of its own: it is the bands'.
+            let clock = match p.kind {
+                ImageKind::MsJpeg => p.exposure_clock_s.or(cap.band_clock_s),
+                _ => p.exposure_clock_s,
+            };
             FileRef {
                 file_name: p.file_name.clone(),
                 path: p.path.clone(),
                 role: role(&p.kind),
                 gimbal_ypr_deg: p.gimbal_ypr_deg,
                 // Both readings come from the same camera clock, so GPS/UTC labels cancel.
-                time_offset_s: p.exposure_clock_s.zip(cap.exposure_clock_s).map(|(f, c)| f - c),
+                time_offset_s: clock.zip(cap.exposure_clock_s).map(|(f, c)| f - c),
                 camera: None,
             }
         })
@@ -211,6 +217,7 @@ fn role(kind: &ImageKind) -> String {
     match kind {
         ImageKind::Jpeg => "jpeg".into(),
         ImageKind::Tiff => "tiff".into(),
+        ImageKind::MsJpeg => "ms_jpeg".into(),
         ImageKind::Band(b) => b.label().to_string(),
     }
 }

@@ -170,6 +170,27 @@ fn camera_centres_follow_the_trajectory_and_lever_arm() {
 }
 
 #[test]
+fn multispectral_camera_jpeg_is_placed_with_the_bands() {
+    let s = setup_with(SyntheticFlight {
+        band_delay_s: 0.0264,
+        ms_jpeg: true,
+        ..Default::default()
+    });
+    let pos = s.bin.join("prepared.pos");
+    write_pos(&pos, &s.flight, None);
+    let rtk = fake_rtklib(&s.bin, &pos, false);
+    let sol = process_flight(&s.report.flights[0], &s.base, &[], &rtk, &options(&s.work)).unwrap();
+    assert_eq!(sol.stats.files_without_position, 0);
+    for e in &sol.exposures {
+        assert_eq!(e.problem, None, "no file falls back on the MRK time");
+        let ms = e.files.iter().find(|f| f.role == "ms_jpeg").unwrap();
+        let green = e.files.iter().find(|f| f.role == "Green").unwrap();
+        assert!((ms.time_offset_s.unwrap() - 0.0264).abs() < 2e-6);
+        assert_eq!(ms.camera, green.camera);
+    }
+}
+
+#[test]
 fn bands_are_placed_at_their_own_exposure_time() {
     // Measured on a real Mavic 3M: bands are exposed about 26 ms after the RGB JPEG.
     let s = setup_with(SyntheticFlight {
