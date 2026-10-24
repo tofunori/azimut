@@ -12,6 +12,10 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
   submission that outlasts the wait).
 - The igs20.atx models of the Emlid Reach RS2, RS2+ and RS3 are embedded: a base on one of
   these antennas positioned by CSRS-PPP no longer needs `--antex`.
+- Other base antennas get their model from igs20.atx, downloaded from files.igs.org into
+  Azimut's cache on first use (folder overridable with `AZIMUT_CACHE_DIR`) and reused
+  offline: `--antex` is no longer needed. `azimut antex` fetches the file ahead of an offline
+  session and checks an antenna. `--antenna-type` uses the same models.
 
 ### Changed
 - `process` refuses to run without a base position source: `--base-llh`, `--base-ppp` or

@@ -63,7 +63,7 @@ programs in an `rtklib` folder next to `azimut`, or add them to the `PATH`.
 
 | File | Needed for | Where |
 |---|---|---|
-| `igs20.atx` | Antenna phase-centre models of the base (`--antex`) | [files.igs.org](https://files.igs.org/pub/station/general/igs20.atx) |
+| `igs20.atx` | Antenna phase-centre models of the base; downloaded into Azimut's cache when needed (`azimut antex` to fetch it ahead of an offline session, see [PPK](ppk.md)) | [files.igs.org](https://files.igs.org/pub/station/general/igs20.atx) |
 | `ca_nrc_CGG2013an83.tif` | CGVD2013 heights for NAD83(CSRS) positions (`--geoid`) | [cdn.proj.org](https://cdn.proj.org/ca_nrc_CGG2013an83.tif) |
 | `ca_nrc_CGG2013ai08.tif` | CGVD2013 heights for ITRF or IGS positions (`--geoid`) | [cdn.proj.org](https://cdn.proj.org/ca_nrc_CGG2013ai08.tif) |
 

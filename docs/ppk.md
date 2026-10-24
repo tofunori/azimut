@@ -45,7 +45,7 @@ Submit the base RINEX to [CSRS-PPP](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/g
 
 ```sh
 azimut process /path/to/campaign --rtklib /path/to/rtklib/bin \
-    --base /path/to/base.26o --base-ppp /path/to/12345678.sum --antex igs20.atx --out results
+    --base /path/to/base.26o --base-ppp /path/to/12345678.sum --out results
 ```
 
 Azimut can also submit the RINEX itself, with the e-mail of your CSRS-PPP account:
@@ -59,7 +59,7 @@ the flights, keeps the results in `<out>/csrs_ppp` and goes on as with `--base-p
 
 ```sh
 azimut ppp /path/to/base.26o --out results/csrs_ppp       # ITRF by default; --sysref nad83
-azimut process /path/to/campaign --base /path/to/base.26o --submit-ppp --antex igs20.atx --out results
+azimut process /path/to/campaign --base /path/to/base.26o --submit-ppp --out results
 ```
 
 Warnings that CSRS-PPP writes in `errors.txt` with its solution (a missing antenna
@@ -76,13 +76,25 @@ point CSRS-PPP estimated:
 | CSRS-PPP summary | The coordinates are | Azimut sets |
 |---|---|---|
 | `ANT NOT FOUND`, `ARP 0 0 0` | the antenna phase centre (no antenna type or height in the RINEX) | no antenna height, no antenna type; warns that this point is not the ground mark |
-| antenna found, `ARP 0 0 0` | the antenna reference point | antenna type, no height; requires `--antex`, except for the embedded antennas below |
-| `ARP` offsets applied | the ground mark | type and offsets from the RINEX header, as CSRS-PPP did; requires `--antex` if the antenna was found, except for the embedded antennas below |
+| antenna found, `ARP 0 0 0` | the antenna reference point | antenna type, no height; the antenna model as below |
+| `ARP` offsets applied | the ground mark | type and offsets from the RINEX header, as CSRS-PPP did; the antenna model as below if the antenna was found |
 
-Azimut embeds the igs20.atx models of the Emlid Reach RS2, RS2+ and RS3. When CSRS-PPP
-applied one of them and no `--antex` is given, Azimut writes them to `results/work/` and
-RTKLIB uses them for the base antenna; `--antex` replaces them. Other antennas still need
-`--antex` (igs20.atx from [files.igs.org](https://files.igs.org/pub/station/general/igs20.atx)).
+When CSRS-PPP applied an antenna model, RTKLIB applies the same one, taken from:
+
+1. `--antex`, when given (e.g. a copy of igs20.atx);
+2. else the igs20.atx models of the Emlid Reach RS2, RS2+ and RS3 embedded in Azimut, written
+   to `results/work/` for RTKLIB;
+3. else igs20.atx in Azimut's cache, downloaded from
+   [files.igs.org](https://files.igs.org/pub/station/general/igs20.atx) the first time an
+   antenna needs it (about 60 MB) and reused offline afterwards. The cache is
+   `~/Library/Caches/azimut` on macOS, `%LOCALAPPDATA%\azimut` on Windows,
+   `$XDG_CACHE_HOME/azimut` or `~/.cache/azimut` on Linux, or `AZIMUT_CACHE_DIR`. A cached
+   copy without the antenna is downloaded again once, since the IGS adds antennas to the file.
+
+Before going to the field without a connection, run `azimut antex` (add
+`--antenna "TRM59800.00     NONE"` to check an antenna, `--update` for the latest file).
+Offline with nothing cached, `process` stops and says where to put the file or to give it
+with `--antex`. The same order applies to `--antenna-type`.
 
 The RINEX given with `--base` must be the one submitted (Azimut warns when the name or the
 antenna offsets differ). `--ppp-system` picks the system when a summary holds several.
