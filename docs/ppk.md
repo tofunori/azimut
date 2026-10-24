@@ -31,7 +31,7 @@ and writes:
 | `<flight>_pix4dmatic.csv` | PIX4Dmatic image geolocation file: latitude, longitude, ellipsoidal height and 1-sigma horizontal and vertical accuracy per file, no angles (see [PIX4Dmatic](pix4dmatic.md)). `<flight>_pix4dmatic.txt` says how to import it. |
 | `<flight>_problems.csv` | Exposures without a position, or without an uncertainty, and why. |
 | `<flight>_solution.json` | Everything above plus the method (PPK file paths, or the RTK shift), statistics and file paths. |
-| `<flight>_report.html`, `_report.json` | Quality report: points to check, captures fixed, trajectory fix rate, horizontal and vertical uncertainty (median and 95th percentile), base, a map of the cameras (status by colour and shape, flight order, scale, north, direction of the base), the 1-sigma E/N/U of each capture, scan findings, the capture table and the files written. A single HTML file without scripts, light and dark, printable; `--report-lang fr` writes it in French. |
+| `<flight>_report.html`, `_report.json` | Quality report: points to check, captures fixed, trajectory fix rate, horizontal and vertical uncertainty (median and 95th percentile), base, a map of the cameras (status by colour and shape, flight order, scale, north, direction of the base), the 1-sigma E/N/U of each capture, scan findings, the capture table and the files written. A single HTML file without scripts, light and dark, printable; `--report-lang fr` writes it in French, `--basemap sentinel2` puts satellite imagery under the map ([basemap](basemap.md)). |
 
 When RTKLIB writes a covariance that is not positive definite (it prints 0 for a negative
 variance, seen on kinematic solutions), the uncertainty columns are left empty rather than

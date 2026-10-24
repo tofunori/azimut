@@ -4,6 +4,7 @@ use std::io::{BufRead as _, IsTerminal as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+mod basemap;
 mod mcp;
 mod settings;
 
@@ -125,6 +126,8 @@ enum Command {
         geoid: Option<PathBuf>,
         #[command(flatten)]
         images: ImageArgs,
+        #[command(flatten)]
+        basemap: basemap::BasemapArgs,
         /// Language of the HTML quality report.
         #[arg(long, value_enum, default_value = "en")]
         report_lang: ReportLang,
@@ -182,6 +185,8 @@ enum Command {
         geoid: Option<PathBuf>,
         #[command(flatten)]
         images: ImageArgs,
+        #[command(flatten)]
+        basemap: basemap::BasemapArgs,
         /// Language of the HTML quality report.
         #[arg(long, value_enum, default_value = "en")]
         report_lang: ReportLang,
@@ -306,11 +311,13 @@ fn main() -> Result<()> {
             roles,
             geoid,
             images,
+            basemap,
             report_lang,
             max_gap,
             tolerance,
         } => {
             anyhow::ensure!(dir.is_dir(), "{} is not a folder", dir.display());
+            let basemap = basemap.source()?;
             // Ask for the CSRS-PPP e-mail now rather than after the scan.
             let mut csrs = csrs;
             if submit_ppp {
@@ -413,6 +420,7 @@ fn main() -> Result<()> {
                 filter: row_filter(roles),
                 geoid: open_geoid(geoid.as_deref(), &opts.base.frame)?,
                 images,
+                basemap,
                 lang: report_lang.into(),
             };
             std::fs::create_dir_all(&out).with_context(|| format!("creating {}", out.display()))?;
@@ -463,10 +471,12 @@ fn main() -> Result<()> {
             roles,
             geoid,
             images,
+            basemap,
             report_lang,
             tolerance,
         } => {
             anyhow::ensure!(dir.is_dir(), "{} is not a folder", dir.display());
+            let basemap = basemap.source()?;
             let mut ppp_frame = None;
             let spec = match (&from, &to, &to_ppp, &enu) {
                 (Some(f), Some(t), None, None) => ShiftSpec::Points {
@@ -533,6 +543,7 @@ fn main() -> Result<()> {
                 filter: row_filter(roles),
                 geoid: open_geoid(geoid.as_deref(), &frame)?,
                 images,
+                basemap,
                 lang: report_lang.into(),
             };
             std::fs::create_dir_all(&out).with_context(|| format!("creating {}", out.display()))?;
@@ -1026,6 +1037,7 @@ struct Outputs {
     filter: RowFilter,
     geoid: Option<GeoidGrid>,
     images: ImageArgs,
+    basemap: basemap::Source,
     lang: Lang,
 }
 
@@ -1065,6 +1077,7 @@ fn finish_flight(
     let mut written = write_outputs(out, name, sol, outputs)?;
     print_solution(sol);
     let mut rep = FlightReport::build(sol, flight, base, outputs.geoid.as_ref());
+    rep.basemap = basemap::fetch(&outputs.basemap, &rep);
     let mut problem = false;
     if outputs.images.write_images.is_some() {
         let (info, p) = write_images_step(out, name, sol, &outputs.images)?;

@@ -5,6 +5,10 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 ## [Unreleased]
 
 ### Added
+- `--basemap sentinel2` (`process`, `shift`, or `AZIMUT_BASEMAP`) draws the report map over
+  EOxCloudless 2016 Sentinel-2 imagery (CC BY 4.0, credit under the map), embedded in the
+  HTML so the report still opens offline; any XYZ tile URL can be given with
+  `--basemap-attribution`. Without network the report is written without it.
 - The CSRS-PPP e-mail is asked in the terminal when it is missing, and remembered in Azimut's
   settings (`config.json`, folder overridable with `AZIMUT_CONFIG_DIR`).
 - MCP tool `submit_ppp`: sends a base RINEX to CSRS-PPP after the user's confirmation, asks

@@ -15,12 +15,15 @@
 //! - [`images`]: positions written into the images themselves (EXIF GPS and DJI XMP), in
 //!   place and only on request, with the original bytes kept for undoing.
 //! - [`report`]: quality report of a flight, as JSON and as a self-contained HTML page.
+//! - [`basemap`]: Web Mercator tiles under the report map; fetched by the caller, embedded
+//!   in the page.
 //!
 //! An uncertainty that RTKLIB could not give (covariance not positive definite) is left
 //! empty, never written as 0 m: photogrammetry software would read 0 as a perfect position.
 
 use std::fmt::Write as _;
 
+pub mod basemap;
 pub mod images;
 pub mod report;
 

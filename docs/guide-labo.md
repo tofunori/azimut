@@ -69,6 +69,10 @@ Ouvrir `D:\resultats\<vol>_report.html` dans un navigateur :
 
 [Voir un exemple de rapport](../examples/demo-flight/rapport-fr.png).
 
+Ajouter `--basemap sentinel2` met une image satellite (Sentinel-2, 10 m) sous la carte des
+caméras. Il faut le réseau au moment du calcul ; sans réseau, le rapport est écrit sans
+fond. Voir [le fond satellite](basemap.md), et pourquoi ni Google ni Esri.
+
 ## 4. Utiliser les positions
 
 - **PIX4Dmatic** : suivre `<vol>_pix4dmatic.txt` (importer `<vol>_pix4dmatic.csv` après les

@@ -21,6 +21,7 @@ azimut-solve.workspace = true
 azimut-export.workspace = true
 azimut-geo.workspace = true
 azimut-csrs.workspace = true
+ureq.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
