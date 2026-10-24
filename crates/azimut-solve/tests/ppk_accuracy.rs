@@ -126,7 +126,7 @@ struct Errors {
 }
 
 /// Process `rover` against `base` and compare with the rover's published position.
-fn baseline(rtklib: &Rtklib, base: &Station, rover: &Station) -> Errors {
+fn baseline(rtklib: &Rtklib, base: &Station, rover: &Station, ppk: &PpkConfig, variant: &str) -> Errors {
     let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/cors-2025-180");
     let tmp = tempfile::tempdir().unwrap();
     let file = |f: String| gunzip(&data.join(f), tmp.path());
@@ -144,7 +144,7 @@ fn baseline(rtklib: &Rtklib, base: &Station, rover: &Station) -> Errors {
         antenna_type: None,
         frame: format!("ITRF2020, epoch {EPOCH:.3}"),
     };
-    let conf = PpkConfig::dji().to_conf(&setup);
+    let conf = ppk.to_conf(&setup);
     let pos_file = rtklib
         .solve(&rover_obs, &base_obs, &navs, &conf, tmp.path(), rover.name)
         .unwrap();
@@ -176,7 +176,7 @@ fn baseline(rtklib: &Rtklib, base: &Station, rover: &Station) -> Errors {
     }
     Errors {
         label: format!(
-            "{} against {} ({:.1} km)",
+            "{} against {} ({:.1} km), {variant}",
             rover.name.to_uppercase(),
             base.name.to_uppercase(),
             baseline_m / 1000.0
@@ -272,7 +272,13 @@ fn cors_baselines_match_published_coordinates() {
     };
     let mut fails = Vec::new();
     for (base, rover) in [(&MIAL, &NOR3), (&MILS, &MISR)] {
-        fails.extend(baseline(&rtklib, base, rover).report());
+        fails.extend(baseline(&rtklib, base, rover, &PpkConfig::dji(), "DJI defaults").report());
+        // Diagnostics, not asserted: the same data with the ionosphere modelled.
+        for (name, iono) in [("ionosphere estimated", "est-stec"), ("iono-free", "dual-freq")] {
+            let mut ppk = PpkConfig::dji();
+            ppk.extra.push(("pos1-ionoopt".into(), iono.into()));
+            baseline(&rtklib, base, rover, &ppk, name).report();
+        }
     }
     assert!(fails.is_empty(), "{fails:#?}");
 }
