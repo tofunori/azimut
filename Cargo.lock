@@ -101,6 +101,7 @@ dependencies = [
  "clap",
  "serde_json",
  "tempfile",
+ "ureq",
  "zip",
 ]
 

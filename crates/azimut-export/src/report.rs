@@ -9,7 +9,9 @@
 //! The page has no script and no external file. Charts are inline SVG: a plan view of the
 //! cameras (status by colour and shape, flight line, scale, north, direction of the base)
 //! and the 1-sigma East, North and Up of each exposure in time order. Hovering a mark shows
-//! its values (SVG titles); the exposure table holds every value.
+//! its values (SVG titles); the exposure table holds every value. A satellite background,
+//! when the caller fetched one ([`crate::basemap`]), is embedded in the map with its credit
+//! underneath, so the page still opens offline.
 
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -21,6 +23,8 @@ use azimut_io::time::{datetime_from_gps_seconds, GPS_UTC_OFFSET_S};
 use azimut_solve::geodesy::ecef_to_geodetic;
 use azimut_solve::{FlightSolution, Method};
 use serde::{Deserialize, Serialize};
+
+use crate::basemap::{base64, tile_corner, Basemap, MapBounds};
 
 /// Language of the HTML page. The JSON keys and the scan messages stay in English.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -136,6 +140,67 @@ pub struct FlightReport {
     pub exposures: Vec<ReportExposure>,
     pub outputs: Vec<PathBuf>,
     pub images: Option<ImagesInfo>,
+    /// Satellite background of the map, set by the caller; not part of the JSON.
+    #[serde(skip)]
+    pub basemap: Option<Basemap>,
+}
+
+/// Size and margin of the plan view, SVG units.
+const MAP_W: f64 = 560.0;
+const MAP_H: f64 = 420.0;
+const MAP_PAD: f64 = 28.0;
+
+/// Plan view geometry: local East and North metres around the mean camera position, and
+/// SVG units per metre.
+struct MapGeom {
+    lat0: f64,
+    lon0: f64,
+    span: f64,
+    scale: f64,
+}
+
+/// Metres per degree of latitude (and of longitude at the equator).
+const M_PER_DEG: f64 = 111_320.0;
+
+impl MapGeom {
+    fn of(pts: &[(&ReportExposure, f64, f64)]) -> Self {
+        let lat0 = pts.iter().map(|p| p.1).sum::<f64>() / pts.len() as f64;
+        let lon0 = pts.iter().map(|p| p.2).sum::<f64>() / pts.len() as f64;
+        let mut g = MapGeom {
+            lat0,
+            lon0,
+            span: 0.0,
+            scale: 1.0,
+        };
+        g.span = pts
+            .iter()
+            .map(|p| g.en(p.1, p.2))
+            .map(|p| p.0.abs().max(p.1.abs()))
+            .fold(5.0f64, f64::max)
+            * 1.1;
+        g.scale = ((MAP_W / 2.0 - MAP_PAD) / g.span).min((MAP_H / 2.0 - MAP_PAD) / g.span);
+        g
+    }
+
+    fn en(&self, lat: f64, lon: f64) -> (f64, f64) {
+        (
+            (lon - self.lon0) * M_PER_DEG * self.lat0.to_radians().cos(),
+            (lat - self.lat0) * M_PER_DEG,
+        )
+    }
+
+    fn px(&self, x: f64, y: f64) -> (f64, f64) {
+        (MAP_W / 2.0 + x * self.scale, MAP_H / 2.0 - y * self.scale)
+    }
+
+    /// Latitude and longitude of an SVG point.
+    fn lat_lon(&self, u: f64, v: f64) -> (f64, f64) {
+        let (x, y) = ((u - MAP_W / 2.0) / self.scale, (MAP_H / 2.0 - v) / self.scale);
+        (
+            self.lat0 + y / M_PER_DEG,
+            self.lon0 + x / (M_PER_DEG * self.lat0.to_radians().cos()),
+        )
+    }
 }
 
 fn percentile(mut v: Vec<f64>, p: f64) -> Option<f64> {
@@ -419,7 +484,42 @@ impl FlightReport {
             exposures,
             outputs: Vec::new(),
             images: None,
+            basemap: None,
         }
+    }
+
+    /// Positioned exposures in time order, with their latitude and longitude.
+    fn map_points(&self) -> Vec<(&ReportExposure, f64, f64)> {
+        let mut pts: Vec<(&ReportExposure, f64, f64)> = self
+            .exposures
+            .iter()
+            .filter_map(|e| Some((e, e.lat_deg?, e.lon_deg?)))
+            .collect();
+        pts.sort_by(|a, b| {
+            a.0.gps_s
+                .partial_cmp(&b.0.gps_s)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        pts
+    }
+
+    /// Area covered by the plan view, for fetching a background; `None` without a
+    /// positioned exposure.
+    pub fn map_bounds(&self) -> Option<MapBounds> {
+        let pts = self.map_points();
+        if pts.is_empty() {
+            return None;
+        }
+        let g = MapGeom::of(&pts);
+        let (north, west) = g.lat_lon(0.0, 0.0);
+        let (south, east) = g.lat_lon(MAP_W, MAP_H);
+        Some(MapBounds {
+            south,
+            west,
+            north,
+            east,
+            m_per_px: 1.0 / g.scale,
+        })
     }
 
     /// Self-contained HTML page in English.
@@ -764,28 +864,17 @@ impl FlightReport {
     /// Plan view: flight line in time order, cameras by status (colour and shape), scale
     /// bar, north arrow, and the direction and distance of the base.
     fn map_svg(&self, lang: Lang, t: &Text) -> String {
-        let mut pts: Vec<(&ReportExposure, f64, f64)> = self
-            .exposures
-            .iter()
-            .filter_map(|e| Some((e, e.lat_deg?, e.lon_deg?)))
-            .collect();
+        let pts = self.map_points();
         if pts.is_empty() {
             return format!("<p class=\"note\">{}</p>", t.no_position);
         }
-        pts.sort_by(|a, b| {
-            a.0.gps_s
-                .partial_cmp(&b.0.gps_s)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        let lat0 = pts.iter().map(|p| p.1).sum::<f64>() / pts.len() as f64;
-        let lon0 = pts.iter().map(|p| p.2).sum::<f64>() / pts.len() as f64;
-        let k = 111_320.0;
-        let en = |lat: f64, lon: f64| ((lon - lon0) * k * lat0.to_radians().cos(), (lat - lat0) * k);
+        let g = MapGeom::of(&pts);
+        let en = |lat: f64, lon: f64| g.en(lat, lon);
         let xy: Vec<(f64, f64)> = pts.iter().map(|p| en(p.1, p.2)).collect();
-        let span = xy.iter().map(|p| p.0.abs().max(p.1.abs())).fold(5.0f64, f64::max) * 1.1;
-        let (w, h, pad) = (560.0, 420.0, 28.0);
-        let scale = ((w / 2.0 - pad) / span).min((h / 2.0 - pad) / span);
-        let px = |x: f64, y: f64| (w / 2.0 + x * scale, h / 2.0 - y * scale);
+        let (span, scale) = (g.span, g.scale);
+        let (w, h, pad) = (MAP_W, MAP_H, MAP_PAD);
+        let px = |x: f64, y: f64| g.px(x, y);
+        let sat = self.basemap.as_ref().filter(|b| !b.tiles.is_empty());
 
         // Smaller marks with a thinner ring when there are many, so they stay apart.
         let (mark_r, dense) = match pts.len() {
@@ -794,10 +883,40 @@ impl FlightReport {
             _ => (2.5, " dense"),
         };
         let mut s = format!(
-            "<svg viewBox=\"0 0 {w} {h}\" role=\"img\" aria-label=\"{}\" class=\"map{dense}\">\
+            "<svg viewBox=\"0 0 {w} {h}\" role=\"img\" aria-label=\"{}\" class=\"map{dense}{}\">\
              <rect class=\"plot\" x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\" rx=\"8\"/>",
-            t.map_title
+            t.map_title,
+            if sat.is_some() { " sat" } else { "" }
         );
+        // Background: each tile placed by its own corners, clipped to the frame, under a
+        // light veil so the marks stay readable.
+        if let Some(b) = sat {
+            let _ = write!(
+                s,
+                "<clipPath id=\"map-clip\"><rect x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\" rx=\"8\"/></clipPath>\
+                 <g class=\"basemap\" clip-path=\"url(#map-clip)\">"
+            );
+            for tile in &b.tiles {
+                let (n, wl) = tile_corner(tile.x, tile.y, b.zoom);
+                let (so, el) = tile_corner(tile.x + 1, tile.y + 1, b.zoom);
+                let (x0, y0) = px(en(n, wl).0, en(n, wl).1);
+                let (x1, y1) = px(en(so, el).0, en(so, el).1);
+                // Half a unit of overlap hides the seams between tiles.
+                let _ = write!(
+                    s,
+                    "<image x=\"{x0:.2}\" y=\"{y0:.2}\" width=\"{:.2}\" height=\"{:.2}\" \
+                     preserveAspectRatio=\"none\" href=\"data:{};base64,{}\"/>",
+                    x1 - x0 + 0.5,
+                    y1 - y0 + 0.5,
+                    esc(&tile.mime),
+                    base64(&tile.data)
+                );
+            }
+            let _ = write!(
+                s,
+                "<rect class=\"veil\" x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\"/></g>"
+            );
+        }
         // Flight line.
         let path: Vec<String> = xy
             .iter()
@@ -912,6 +1031,14 @@ impl FlightReport {
             legend_shape("single"),
             t.other
         );
+        if let Some(b) = sat {
+            let _ = write!(
+                s,
+                "<p class=\"note credit\">{}{}</p>",
+                t.background,
+                esc(&b.attribution)
+            );
+        }
         s
     }
 
@@ -1063,6 +1190,7 @@ struct Text {
     every: &'static str,
     map_title: &'static str,
     map_note: &'static str,
+    background: &'static str,
     sigma_title: &'static str,
     sigma_chart_note: &'static str,
     file: &'static str,
@@ -1130,6 +1258,7 @@ impl Text {
                 every: "every",
                 map_title: "Camera positions",
                 map_note: "North up, in flight order",
+                background: "Background: ",
                 sigma_title: "Uncertainty per capture",
                 sigma_chart_note: "1-sigma East, North, Up, in flight order",
                 file: "File",
@@ -1193,6 +1322,7 @@ impl Text {
                 every: "aux",
                 map_title: "Positions des caméras",
                 map_note: "Nord en haut, dans l'ordre du vol",
+                background: "Fond : ",
                 sigma_title: "Incertitude par capture",
                 sigma_chart_note: "1 sigma Est, Nord, Haut, dans l'ordre du vol",
                 file: "Fichier",
@@ -1454,6 +1584,10 @@ svg.map,svg.chart{width:100%;height:auto;display:block}.plot{fill:var(--page);st
 .mark.other>*:not(title),.key-shape.other>*{fill:var(--crit)}.mark:hover>*:not(title){stroke:var(--ink)}\
 .scale line{stroke:var(--ink2);stroke-width:2}.scale text,.north text,.base text,.tick,.end{fill:var(--ink2);font-size:12px}\
 .north path{fill:var(--ink2)}.base path{fill:var(--ink)}\
+.veil{fill:#000;opacity:.12}.sat .track{stroke:#fff;stroke-opacity:.85}.sat .scale line{stroke:#fff}\
+.sat .scale text,.sat .north text,.sat .base text{fill:#fff;paint-order:stroke;stroke:rgba(0,0,0,.7);stroke-width:3px}\
+.sat .north path,.sat .base path{fill:#fff;stroke:rgba(0,0,0,.7);stroke-width:1}\
+.sat .mark circle,.sat .mark path,.sat .mark rect{stroke:#fff}.credit{margin-top:6px}\
 .grid{stroke:var(--grid);stroke-width:1}.axis{stroke:var(--axis);stroke-width:1}.tick{font-variant-numeric:tabular-nums}\
 polyline.s0,polyline.s1,polyline.s2{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}\
 polyline.s0{stroke:var(--s0)}polyline.s1{stroke:var(--s1)}polyline.s2{stroke:var(--s2)}\

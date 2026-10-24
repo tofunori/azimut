@@ -215,7 +215,8 @@ fn tool_list() -> Value {
                 "geoid": { "type": "string", "description": "Geoid grid (PROJ GeoTIFF) for orthometric heights, e.g. ca_nrc_CGG2013an83.tif." },
                 "rtklib_dir": { "type": "string" },
                 "roles": paths,
-                "report_lang": { "type": "string", "enum": ["en", "fr"], "description": "Language of the HTML report (use the user's)." }
+                "report_lang": { "type": "string", "enum": ["en", "fr"], "description": "Language of the HTML report (use the user's)." },
+                "basemap": { "type": "string", "description": "Satellite background of the report map, fetched over the network and embedded: sentinel2 (EOxCloudless 2016, 10 m, CC BY 4.0). Only when the user asks for one." }
             }, "required": ["dir", "out"] }
         },
         {
@@ -232,7 +233,8 @@ fn tool_list() -> Value {
                 "frame": { "type": "string" },
                 "geoid": { "type": "string" },
                 "roles": paths,
-                "report_lang": { "type": "string", "enum": ["en", "fr"] }
+                "report_lang": { "type": "string", "enum": ["en", "fr"] },
+                "basemap": { "type": "string", "description": "As in process_ppk." }
             }, "required": ["dir", "out"] }
         },
         {
@@ -571,6 +573,9 @@ fn common_args(args: &Value, v: &mut Vec<String>) {
     }
     if let Some(l) = s(args, "report_lang") {
         v.extend(["--report-lang".into(), l.into()]);
+    }
+    if let Some(b) = s(args, "basemap") {
+        v.extend(["--basemap".into(), b.into()]);
     }
     let roles = strings(args, "roles");
     if !roles.is_empty() {
