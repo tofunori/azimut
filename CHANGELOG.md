@@ -4,6 +4,11 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Changed
+- `process` refuses to run without a base position source: `--base-llh`, `--base-ppp` or
+  `--submit-ppp`. The approximate RINEX header position, used silently before, now needs
+  `--approximate-base`.
+
 ## [0.2.0] - 2026-10-24
 
 ### Added
