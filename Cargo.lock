@@ -90,7 +90,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "azimut-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "azimut-csrs",
@@ -106,7 +106,7 @@ dependencies = [
 
 [[package]]
 name = "azimut-csrs"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "azimut-io",
  "tempfile",
@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "azimut-export"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "azimut-geo",
  "azimut-io",
@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "azimut-geo"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "azimut-geo",
  "tempfile",
@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "azimut-io"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "azimut-io",
  "chrono",
@@ -155,7 +155,7 @@ dependencies = [
 
 [[package]]
 name = "azimut-solve"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "azimut-io",
  "chrono",
