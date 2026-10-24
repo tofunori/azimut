@@ -211,7 +211,7 @@ fn tool_list() -> Value {
                 "base_position": { "type": "object", "description": "Where the base coordinates come from: {\"ppp_summary\": \"file.sum\", \"ppp_system\": optional}, or {\"lat\", \"lon\", \"h\" (ellipsoidal), \"frame\" (frame and epoch)}, or {\"rinex_header\": true} for relative work only (approximate)." },
                 "antenna_height": { "type": "number", "description": "Base antenna height above the mark, m (with antenna_type), when not taken from the RINEX header." },
                 "antenna_type": { "type": "string" },
-                "antex": { "type": "string", "description": "ANTEX file (e.g. igs20.atx)." },
+                "antex": { "type": "string", "description": "ANTEX file (e.g. igs20.atx). Optional: without it, the base antenna model comes from the embedded Emlid models or from igs20.atx, downloaded into Azimut's cache on first use." },
                 "geoid": { "type": "string", "description": "Geoid grid (PROJ GeoTIFF) for orthometric heights, e.g. ca_nrc_CGG2013an83.tif." },
                 "rtklib_dir": { "type": "string" },
                 "roles": paths,

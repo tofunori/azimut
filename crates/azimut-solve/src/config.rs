@@ -130,11 +130,17 @@ impl BaseSetup {
         ))
     }
 
-    /// The antenna whose phase-centre model CSRS-PPP applied, when the embedded models hold
-    /// it: RTKLIB then needs them if no ANTEX file is given.
-    pub fn ppp_embedded_antenna(sum: &PppSummary) -> Option<&str> {
+    /// The antenna whose phase-centre model CSRS-PPP applied: RTKLIB needs the same model,
+    /// from the embedded ones (see [`crate::antex`]) or from an ANTEX file.
+    pub fn ppp_antenna(sum: &PppSummary) -> Option<&str> {
         let ant = sum.antenna.as_deref()?;
-        (sum.point() != PppPoint::PhaseCentre && crate::antex::is_embedded(ant)).then_some(ant)
+        (sum.point() != PppPoint::PhaseCentre).then_some(ant)
+    }
+
+    /// [`Self::ppp_antenna`] when the embedded models hold it: RTKLIB then needs them if no
+    /// ANTEX file is given.
+    pub fn ppp_embedded_antenna(sum: &PppSummary) -> Option<&str> {
+        Self::ppp_antenna(sum).filter(|ant| crate::antex::is_embedded(ant))
     }
 }
 

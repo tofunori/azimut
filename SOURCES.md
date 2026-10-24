@@ -89,6 +89,7 @@ Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](
 |---|---|---|
 | Emlid Reach RS2, RS2+ and RS3 receiver antenna models (`EML_REACH_RS2   NONE`, `EML_REACH_RS2+  NONE`, `EML_REACH_RS3   NONE`), copied unchanged; RS2 calibrated by Geoscience Australia (robot, 2022), RS2+ and RS3 copied from RS2 by the IGS | `antex.rs`, `data/emlid_igs20.atx` | [IGS igs20.atx](https://files.igs.org/pub/station/general/igs20.atx), last change week 2438, downloaded 2026-10-23, SHA-256 `0cd58d0d9ee678d5586de6c01f576e5aceb86f4a0735a168f733dfd091c0a614` |
 | The embedded file holds receiver antennas only and is given to RTKLIB as `file-rcvantfile` alone; in Azimut's kinematic PPK this gives the same positions as the full igs20.atx as both files | `config.rs` (`receiver_antex`) | Own measurement: Mavic 3M flight of 6 October 2026, Emlid RS2 base positioned by CSRS-PPP, 73 files, identical latitude, longitude and height with either file |
+| Other antennas: the full igs20.atx is downloaded, not embedded (tens of MB, updated by the IGS as antennas are added), from its permanent URL into a cache, and given to RTKLIB as both antenna files, as `--antex` does; a cached copy without the antenna is downloaded again once | `antex_cache.rs` (azimut-cli) | [IGS igs20.atx](https://files.igs.org/pub/station/general/igs20.atx) |
 
 ## CSRS-PPP service
 

@@ -4,6 +4,7 @@ use std::io::{BufRead as _, IsTerminal as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+mod antex_cache;
 mod mcp;
 mod settings;
 
@@ -74,8 +75,9 @@ enum Command {
         /// Base antenna height above the mark (m). Default: from the RINEX header.
         #[arg(long)]
         antenna_height: Option<f64>,
-        /// IGS base antenna type with radome (needs --antex to have an effect). Requires
-        /// --antenna-height: without both, type and height come from the RINEX header.
+        /// IGS base antenna type with radome; its phase-centre model comes from --antex, the
+        /// embedded models or the cached igs20.atx. Requires --antenna-height: without both,
+        /// type and height come from the RINEX header.
         #[arg(long, requires = "antenna_height")]
         antenna_type: Option<String>,
         /// CSRS-PPP summary (.sum) of the base RINEX: base position, antenna handling and
@@ -102,8 +104,9 @@ enum Command {
         #[arg(long, value_name = "SYSTEM", requires = "ppp_source")]
         ppp_system: Option<String>,
         /// ANTEX file with antenna phase-centre models (e.g. igs20.atx). Without it, the
-        /// embedded igs20.atx models of the Emlid Reach RS2, RS2+ and RS3 are used when
-        /// CSRS-PPP applied one of them.
+        /// base antenna model comes from the embedded igs20.atx entries (Emlid Reach RS2,
+        /// RS2+ and RS3), else from igs20.atx in Azimut's cache, downloaded from files.igs.org
+        /// on first use (see `azimut antex`).
         #[arg(long)]
         antex: Option<PathBuf>,
         /// Folder holding RTKLIB-EX convbin and rnx2rtkp (else AZIMUT_RTKLIB_DIR, then PATH).
@@ -229,6 +232,16 @@ enum Command {
         /// Edit record written by --write-images.
         file: PathBuf,
     },
+    /// Download the IGS antenna file igs20.atx into Azimut's cache, so that `process` finds
+    /// base antenna models offline, and show where it is.
+    Antex {
+        /// Download again even if a copy is cached (the IGS adds antennas to the file).
+        #[arg(long)]
+        update: bool,
+        /// Check that this antenna type with radome has a model, e.g. "TRM59800.00     NONE".
+        #[arg(long, value_name = "TYPE")]
+        antenna: Option<String>,
+    },
     /// Run as a Model Context Protocol server on stdio, so that an agent (Claude, Codex...)
     /// can scan, process and write images for a user, asking at each decision.
     Mcp,
@@ -340,6 +353,24 @@ fn main() -> Result<()> {
                     None => (None, None, ppp_system),
                 }
             };
+            // The base antenna whose model RTKLIB must apply: the one CSRS-PPP applied, or
+            // --antenna-type. Neither embedded nor given with --antex: igs20.atx from the cache.
+            let model_antenna = match &ppp {
+                Some(sum) => BaseSetup::ppp_antenna(sum).map(str::to_string),
+                None => antenna_type.clone(),
+            };
+            let mut antex = antex;
+            let mut cached_antex = None;
+            if antex.is_none() {
+                if let Some(ant) = model_antenna
+                    .as_deref()
+                    .filter(|a| !azimut_solve::antex::is_embedded(a))
+                {
+                    let source = antex_cache::for_antenna(ant)?;
+                    antex = Some(source.path().to_path_buf());
+                    cached_antex = Some((ant.to_string(), source));
+                }
+            }
             let base_setup = match (&ppp, &ppp_path) {
                 (Some(sum), Some(path)) => {
                     let (mut setup, point) = BaseSetup::from_ppp(sum, ppp_system.as_deref(), antex.is_some())
@@ -392,9 +423,22 @@ fn main() -> Result<()> {
             } else {
                 PpkConfig::dji()
             };
-            // CSRS-PPP applied a model the embedded ones hold: give it to RTKLIB.
-            if antex.is_none() {
-                if let Some(ant) = ppp.as_ref().and_then(BaseSetup::ppp_embedded_antenna) {
+            // Say where the base antenna model comes from; the embedded models are written for
+            // RTKLIB.
+            if let Some((ant, source)) = &cached_antex {
+                let how = match source {
+                    antex_cache::Source::Cached(_) => "cached",
+                    antex_cache::Source::Downloaded(_) => "downloaded",
+                };
+                println!(
+                    "   antenna model: {ant} from igs20.atx ({how}, {})",
+                    source.path().display()
+                );
+            } else if antex.is_none() {
+                if let Some(ant) = model_antenna
+                    .as_deref()
+                    .filter(|a| azimut_solve::antex::is_embedded(a))
+                {
                     let path = azimut_solve::antex::write_embedded(&out.join("work")).with_context(|| {
                         format!("writing the embedded antenna models into {}", out.display())
                     })?;
@@ -630,6 +674,7 @@ fn main() -> Result<()> {
             println!("{restored} image(s) restored, {already} already original, {failed} not restored.");
             std::process::exit(if failed > 0 { 2 } else { 0 });
         }
+        Command::Antex { update, antenna } => antex_command(update, antenna.as_deref()),
         Command::Mcp => mcp::serve(),
         Command::DemoBase { file } => {
             if let Some(parent) = file.parent() {
@@ -1432,4 +1477,43 @@ fn print_report(r: &ScanReport) {
             println!("   [{tag}] {}", x.message);
         }
     }
+}
+
+/// `azimut antex`: make sure igs20.atx is cached (downloading it if needed or asked) and
+/// report where the model of `antenna` comes from.
+fn antex_command(update: bool, antenna: Option<&str>) -> Result<()> {
+    if let Some(ant) = antenna.filter(|a| azimut_solve::antex::is_embedded(a)) {
+        println!("{ant}: embedded in Azimut (igs20.atx entry), no download needed");
+        if !update {
+            return Ok(());
+        }
+    }
+    let path = antex_cache::path().context("no cache folder found (set AZIMUT_CACHE_DIR)")?;
+    let text = match antex_cache::read_cached(&path) {
+        Some(text) if !update => {
+            println!("igs20.atx: {} (cached)", path.display());
+            text
+        }
+        _ => {
+            println!("downloading {} into {}", antex_cache::url(), path.display());
+            let text = antex_cache::download(&path).with_context(|| {
+                format!(
+                    "downloading igs20.atx; offline, download {} on a connected computer and \
+                     copy it to {}",
+                    antex_cache::URL,
+                    path.display()
+                )
+            })?;
+            println!("igs20.atx: {} (downloaded)", path.display());
+            text
+        }
+    };
+    if let Some(ant) = antenna.filter(|a| !azimut_solve::antex::is_embedded(a)) {
+        anyhow::ensure!(
+            azimut_solve::antex::holds(&text, ant),
+            "igs20.atx has no model for {ant} (try --update for the latest file)"
+        );
+        println!("{ant}: model found");
+    }
+    Ok(())
 }
