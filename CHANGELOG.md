@@ -5,6 +5,9 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 ## [Unreleased]
 
 ### Added
+- PPK accuracy check against published NGS CORS coordinates (two baselines, 4.8 and 11 km,
+  1 s data), run in CI with RTKLIB-EX. Results in docs/validation.md: 2 to 5 cm biases with
+  the DJI defaults, mostly differential ionosphere, and RTKLIB 1-sigma 4 to 10 times too small.
 - The CSRS-PPP e-mail is asked in the terminal when it is missing, and remembered in Azimut's
   settings (`config.json`, folder overridable with `AZIMUT_CONFIG_DIR`).
 - MCP tool `submit_ppp`: sends a base RINEX to CSRS-PPP after the user's confirmation, asks

@@ -72,6 +72,7 @@ Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](
 | A negative variance is written as `sdx = 0` (macro `SQRT`), so a covariance that is not positive definite cannot be told apart from a zero one; such covariances were measured in kinematic mode on RTKLIB-EX's own test data (`test/data/rinex`, stations 0759 and 3040, 2005-04-02: 102 of 115 epochs with stock options, none in static mode). The uncertainty is then left empty | `camera.rs`, `azimut-export` | `src/solution.c` (`SQRT`, `outecef`); own measurement with RTKLIB-EX `50886e2` |
 | Solution status codes 1 fix, 2 float, 3 SBAS, 4 DGPS, 5 single, 6 PPP, 7 dead reckoning | `pos.rs` | `src/rtklib.h` (`SOLQ_*`) |
 | `rnx2rtkp -k conf -o out rover base nav...` | `rtklib.rs` | `app/consapp/rnx2rtkp/rnx2rtkp.c` |
+| With the DJI defaults (broadcast ionosphere), positions of fixed epochs carry a 2 to 5 cm bias on 5 to 11 km baselines in June 2025, mostly removed horizontally by `pos1-ionoopt=est-stec`; RTKLIB's 1-sigma is 4 to 10 times smaller than the error | `tests/ppk_accuracy.rs`, docs/validation.md | Own measurement with RTKLIB-EX `50886e2` on NGS CORS MIAL, NOR3, MILS, MISR (NOAA open data, `s3://noaa-cors-pds`), against their published ITRF2020 coordinates |
 | `convbin -r rtcm3 -tr y/m/d h:m:s -v 3.04 -od -os -o obs -n nav` (RTCM 3 needs an approximate date) | `rtklib.rs` | `app/consapp/convbin/convbin.c` |
 
 ## CSRS-PPP
