@@ -9,6 +9,11 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
   `--submit-ppp`. The approximate RINEX header position, used silently before, now needs
   `--approximate-base`.
 
+### Fixed
+- Mavic 3M captures that also hold the multispectral camera's JPEG (`_F.JPG`) were reported
+  incomplete (2 JPEG) and that file was placed at the MRK time. It now has its own role
+  (`ms_jpeg`) and is positioned at the bands' exposure time.
+
 ## [0.2.0] - 2026-10-24
 
 ### Added
