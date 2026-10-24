@@ -1,10 +1,11 @@
 //! `azimut` command-line tool.
 
-use std::io::Write as _;
+use std::io::{BufRead as _, IsTerminal as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 mod mcp;
+mod settings;
 
 use anyhow::{Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
@@ -81,7 +82,8 @@ enum Command {
         )]
         base_ppp: Option<PathBuf>,
         /// Submit the base RINEX to CSRS-PPP, wait for the result and use it as --base-ppp
-        /// would. Needs --email; the results are kept in <out>/csrs_ppp.
+        /// would. Needs the e-mail of your CSRS-PPP account (see --email); the results are
+        /// kept in <out>/csrs_ppp.
         #[arg(long, conflicts_with_all = ["base_ppp", "base_llh", "antenna_height", "antenna_type"])]
         submit_ppp: bool,
         #[command(flatten)]
@@ -296,6 +298,11 @@ fn main() -> Result<()> {
             tolerance,
         } => {
             anyhow::ensure!(dir.is_dir(), "{} is not a folder", dir.display());
+            // Ask for the CSRS-PPP e-mail now rather than after the scan.
+            let mut csrs = csrs;
+            if submit_ppp {
+                csrs.email = Some(csrs_email(&csrs)?);
+            }
             let report = scan(
                 &dir,
                 &ScanOptions {
@@ -537,6 +544,8 @@ fn main() -> Result<()> {
                 BaseSetup::from_ppp(&r.summary, system.as_deref(), true).map_err(anyhow::Error::msg)?;
             print_ppp(&r.summary, system.as_deref(), &point)?;
             print_ppp_notes(r.notes.as_deref());
+            // Read back by the MCP server.
+            println!("   summary: {}", r.summary_path.display());
             if r.summary.positions.len() > 1 {
                 let all: Vec<&str> = r.summary.positions.iter().map(|p| p.system.as_str()).collect();
                 println!(
@@ -657,7 +666,9 @@ fn read_ppp(path: &Path) -> Result<PppSummary> {
 /// CSRS-PPP submission options, shared by `ppp` and `process --submit-ppp`.
 #[derive(clap::Args, Clone)]
 struct CsrsArgs {
-    /// E-mail of your CSRS-PPP account (NRCan), for submissions.
+    /// E-mail of your CSRS-PPP account (NRCan), for submissions. Without it, the one
+    /// remembered in Azimut's settings is used; in a terminal, Azimut asks for it once and
+    /// remembers it.
     #[arg(long, env = "AZIMUT_CSRS_EMAIL", value_name = "ADDRESS")]
     email: Option<String>,
     /// Reference system CSRS-PPP computes in: ITRF at the epoch of the observations, or
@@ -701,12 +712,10 @@ fn csrs_fetch(
     let key = match (resume, rinex) {
         (Some(key), _) => key.trim().to_string(),
         (None, Some(rinex)) => {
-            let email = args.email.as_deref().context(
-                "CSRS-PPP needs the e-mail of your account: give --email or set AZIMUT_CSRS_EMAIL",
-            )?;
+            let email = csrs_email(args)?;
             let req = CsrsRequest {
                 rinex,
-                email,
+                email: &email,
                 process_type: match args.ppp_mode {
                     PppMode::Static => ProcessType::Static,
                     PppMode::Kinematic => ProcessType::Kinematic,
@@ -766,6 +775,50 @@ fn csrs_fetch(
         r.files.len()
     );
     Ok(r)
+}
+
+/// The e-mail of the CSRS-PPP account: --email (or AZIMUT_CSRS_EMAIL), else the one
+/// remembered in the settings, else asked in a terminal and remembered.
+fn csrs_email(args: &CsrsArgs) -> Result<String> {
+    if let Some(e) = &args.email {
+        let e = e.trim();
+        anyhow::ensure!(
+            settings::valid_email(e),
+            "--email: {e:?} is not an e-mail address"
+        );
+        return Ok(e.to_string());
+    }
+    if let Some(e) = settings::csrs_email() {
+        return Ok(e);
+    }
+    let stdin = std::io::stdin();
+    anyhow::ensure!(
+        stdin.is_terminal(),
+        "CSRS-PPP needs the e-mail of your account: give --email or set AZIMUT_CSRS_EMAIL \
+         (run azimut once in a terminal to be asked and have it remembered)"
+    );
+    for _ in 0..3 {
+        print!("\nE-mail of your CSRS-PPP account (NRCan): ");
+        std::io::stdout().flush().ok();
+        let mut line = String::new();
+        if stdin.lock().read_line(&mut line)? == 0 {
+            break;
+        }
+        let e = line.trim();
+        if !settings::valid_email(e) {
+            println!("   {e:?} is not an e-mail address.");
+            continue;
+        }
+        match settings::save_csrs_email(e) {
+            Ok(path) => println!(
+                "   remembered in {} for the next submissions (--email overrides it)",
+                path.display()
+            ),
+            Err(err) => println!("   not remembered: {err:#}"),
+        }
+        return Ok(e.to_string());
+    }
+    anyhow::bail!("no CSRS-PPP e-mail given")
 }
 
 /// Warnings CSRS-PPP wrote in errors.txt alongside its solution.

@@ -26,6 +26,7 @@ Then ask, for example: "Do the PPK of the flights in `field/2024-08-09` with the
 |---|---|
 | `scan_folder` | Inventory and diagnosis (read only). |
 | `read_ppp_summary` | Position, systems, uncertainty and point of a CSRS-PPP summary (read only). |
+| `submit_ppp` | Sends a base RINEX to CSRS-PPP after `confirm: true`, waits and returns the summary for `process_ppk`; asks for the account e-mail once and remembers it; `resume` fetches a submission that outlasted the wait. |
 | `process_ppk` | PPK; writes the outputs and report, returns the report summary. Images untouched. |
 | `shift_rtk` | RTK correction; same outputs. |
 | `write_images` | Positions into the images, in place or into copies; dry run unless `confirm: true`. |
@@ -33,9 +34,10 @@ Then ask, for example: "Do the PPK of the flights in `field/2024-08-09` with the
 | `read_report` | Full report of a flight. |
 
 The server never takes a decision that is the user's. When the base files, the base
-coordinates, their frame, the shift, the image mode or the consent to write images are
-missing, the tool does nothing and returns `status: "needs_decision"` (or
-`"needs_confirmation"` after a dry run) with the questions for the agent to ask. Coordinates
+coordinates, their frame, the shift, the image mode, the CSRS-PPP e-mail, the consent to send
+the base RINEX to NRCan or the consent to write images are missing, the tool does nothing and returns `status: "needs_decision"` (or
+`"needs_confirmation"`: after a dry run for images, before sending the RINEX for CSRS-PPP)
+with the questions for the agent to ask. Coordinates
 are never accepted without a frame. The server also gives the agent working instructions and
 a `ppk_workflow` prompt (step by step, asking at each decision). Long runs send progress
 notifications when the client asks for them; if the client times out tool calls, raise its

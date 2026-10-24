@@ -10,7 +10,7 @@
 //! modify images) does nothing and returns `status: "needs_decision"` with the questions to
 //! ask. Writing into images needs a dry run first and then `confirm: true`.
 //!
-//! `process_ppk`, `shift_rtk`, `write_images` and `restore_images` run this same `azimut`
+//! `submit_ppp`, `process_ppk`, `shift_rtk`, `write_images` and `restore_images` run this same `azimut`
 //! program as a child process, so their console output never reaches the protocol stream;
 //! the server reads back the JSON reports they write.
 
@@ -34,9 +34,10 @@ correction of RTK flights) and writes them for photogrammetry software. Work ste
 and ask the user at each decision; never guess a value that only the user knows.
 1. Call scan_folder first and summarise its findings (incomplete captures, RTK status, base \
 coverage). Ask how to handle errors and warnings before going on.
-2. Base coordinates: ask where they come from (a CSRS-PPP .sum file, known coordinates with \
-their reference frame and epoch, or the approximate RINEX header position for relative work \
-only). Never invent coordinates, a frame, an antenna height or antenna type.
+2. Base coordinates: ask where they come from (a CSRS-PPP .sum file, a submission of the base \
+RINEX to CSRS-PPP with submit_ppp, known coordinates with their reference frame and epoch, or \
+the approximate RINEX header position for relative work only). Never invent coordinates, a \
+frame, an antenna height, an antenna type or an e-mail address.
 3. Heights: ask whether orthometric heights (CGVD2013) are wanted; the geoid grid must match \
 the frame (ca_nrc_CGG2013an83.tif for NAD83(CSRS), ca_nrc_CGG2013ai08.tif for ITRF/IGS).
 4. After process_ppk or shift_rtk, report the summary and every 'attention' point as given.
@@ -50,9 +51,9 @@ Help me compute the camera positions of my DJI flights with Azimut. Go step by s
 before each decision:
 1. Scan the folder I give you (scan_folder) and summarise what you find: flights, captures, \
 RTK status, base files and how well they cover each flight, warnings and errors.
-2. Ask me how the base position is known (CSRS-PPP summary, known coordinates with frame and \
-epoch, or approximate). Read a CSRS-PPP summary with read_ppp_summary and tell me which point \
-it refers to.
+2. Ask me how the base position is known (CSRS-PPP summary, a submission of the base RINEX to \
+CSRS-PPP, known coordinates with frame and epoch, or approximate). Submit with submit_ppp after \
+my yes, or read a summary with read_ppp_summary, and tell me which point it refers to.
 3. Ask whether I want CGVD2013 heights, then run process_ppk (or shift_rtk for an RTK flight).
 4. Summarise the report: fix rate, uncertainties, problems and every point to check.
 5. Ask whether to write the positions into the images, in place or into copies; show me the \
@@ -186,6 +187,21 @@ fn tool_list() -> Value {
             "annotations": { "readOnlyHint": true }
         },
         {
+            "name": "submit_ppp",
+            "description": "Submit a base-station RINEX to NRCan CSRS-PPP, wait for the result and return its summary (position per reference system, 95 % uncertainty, which point it refers to) and the .sum file for process_ppk. Sends the file to NRCan: without confirm: true it only asks for confirmation. Without an e-mail (argument, AZIMUT_CSRS_EMAIL or remembered) it asks for it; an e-mail given here is remembered. If the wait ends first, returns status 'pending' with the tracking key: call again with resume.",
+            "inputSchema": { "type": "object", "properties": {
+                "rinex": { "type": "string", "description": "Base RINEX observation file, as recorded." },
+                "out": { "type": "string", "description": "Folder for the CSRS-PPP results." },
+                "email": { "type": "string", "description": "E-mail of the user's CSRS-PPP account; ask the user, never guess." },
+                "sysref": { "type": "string", "enum": ["itrf", "nad83"], "description": "ITRF at the observation epoch (default), or NAD83(CSRS) with CGVD2013 heights." },
+                "mode": { "type": "string", "enum": ["static", "kinematic"] },
+                "wait_minutes": { "type": "number", "description": "Longest wait for the result (default 15). Lower it if the client stops long tool calls." },
+                "resume": { "type": "string", "description": "Tracking key of an earlier submission: fetch its results instead of submitting." },
+                "confirm": { "type": "boolean" }
+            }, "required": ["out"] },
+            "annotations": { "openWorldHint": true }
+        },
+        {
             "name": "process_ppk",
             "description": "PPK of every flight in DIR against a base station (RTKLIB-EX). Writes positions CSV, OpenDroneMap geo.txt, PIX4Dmatic geolocation files and import notes, solution JSON and a quality report (JSON and HTML) per flight into OUT, and returns the report summaries. Does not modify images. Returns needs_decision when the base coordinates or their frame are not given.",
             "inputSchema": { "type": "object", "properties": {
@@ -281,6 +297,7 @@ fn call_tool(
     match name {
         "scan_folder" => scan_folder(args),
         "read_ppp_summary" => read_ppp_summary(args),
+        "submit_ppp" => submit_ppp(args, progress, out),
         "process_ppk" => process_ppk(args, progress, out),
         "shift_rtk" => shift_rtk(args, progress, out),
         "write_images" => write_images(args, progress, out),
@@ -383,7 +400,11 @@ fn scan_folder(args: &Value) -> anyhow::Result<Value> {
 
 fn read_ppp_summary(args: &Value) -> anyhow::Result<Value> {
     let file = s(args, "file").ok_or_else(|| anyhow::anyhow!("file is required"))?;
-    let sum = csrs_ppp::read(Path::new(file))?;
+    ppp_summary_value(Path::new(file))
+}
+
+fn ppp_summary_value(file: &Path) -> anyhow::Result<Value> {
+    let sum = csrs_ppp::read(file)?;
     let point = match sum.point() {
         csrs_ppp::PppPoint::PhaseCentre => {
             "the antenna phase centre (no antenna type or height in the RINEX): not the ground mark"
@@ -399,6 +420,99 @@ fn read_ppp_summary(args: &Value) -> anyhow::Result<Value> {
     }))
 }
 
+fn submit_ppp(args: &Value, progress: Option<Value>, out: &mut impl Write) -> anyhow::Result<Value> {
+    let out_dir = s(args, "out").ok_or_else(|| anyhow::anyhow!("out is required"))?;
+    let mut v: Vec<String> = vec!["ppp".into()];
+    if let Some(key) = s(args, "resume") {
+        v.extend(["--resume".into(), key.into()]);
+    } else {
+        let rinex = s(args, "rinex").ok_or_else(|| anyhow::anyhow!("rinex (or resume) is required"))?;
+        anyhow::ensure!(Path::new(rinex).is_file(), "{rinex} is not a file");
+        let email = match s(args, "email") {
+            Some(e) => {
+                let e = e.trim();
+                anyhow::ensure!(crate::settings::valid_email(e), "{e:?} is not an e-mail address");
+                // The user gave it to the agent: remember it like a terminal answer.
+                if crate::settings::csrs_email().as_deref() != Some(e) {
+                    crate::settings::save_csrs_email(e)?;
+                }
+                e.to_string()
+            }
+            None => match std::env::var("AZIMUT_CSRS_EMAIL")
+                .ok()
+                .filter(|e| crate::settings::valid_email(e.trim()))
+                .or_else(crate::settings::csrs_email)
+            {
+                Some(e) => e,
+                None => {
+                    return Ok(needs(
+                        "needs_decision",
+                        "no CSRS-PPP e-mail is known",
+                        vec![question(
+                            "email",
+                            "What is the e-mail of your CSRS-PPP account (NRCan)? Azimut remembers it for the next submissions.",
+                            &[],
+                        )],
+                    ))
+                }
+            },
+        };
+        if args.get("confirm").and_then(Value::as_bool) != Some(true) {
+            return Ok(json!({
+                "status": "needs_confirmation",
+                "reason": "the base RINEX is about to be sent to NRCan CSRS-PPP",
+                "questions": [question(
+                    "confirm",
+                    &format!("Send {rinex} to NRCan CSRS-PPP with the account {email}?"),
+                    &["yes", "no"],
+                )],
+            }));
+        }
+        v.extend([rinex.into(), "--email".into(), email]);
+        if let Some(sys) = s(args, "sysref") {
+            v.extend(["--sysref".into(), sys.into()]);
+        }
+        if let Some(mode) = s(args, "mode") {
+            v.extend(["--ppp-mode".into(), mode.into()]);
+        }
+    }
+    if let Some(w) = args.get("wait_minutes").and_then(Value::as_f64) {
+        v.extend(["--ppp-timeout".into(), w.to_string()]);
+    }
+    v.extend(["--out".into(), out_dir.into()]);
+
+    let run = run_azimut(&v, progress, out)?;
+    let key = run
+        .log
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("tracking key: "))
+        .or_else(|| s(args, "resume"))
+        .map(str::to_string);
+    if run.code != Some(0) {
+        // Only a wait that ran out is worth resuming; other errors are reported as failures.
+        let pending = run.log.contains("CSRS-PPP still processing");
+        return Ok(json!({
+            "status": if pending { "pending" } else { "failed" },
+            "tracking_key": key,
+            "log": run.log,
+            "next": if pending { "call submit_ppp again with resume: tracking_key, later" } else { "report the log to the user" },
+        }));
+    }
+    // The summary this run wrote, as `azimut ppp` names it.
+    let summary = run
+        .log
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("summary: "))
+        .map(PathBuf::from)
+        .ok_or_else(|| anyhow::anyhow!("azimut ppp did not name its summary file"))?;
+    let mut v = ppp_summary_value(&summary)?;
+    v["summary_file"] = json!(summary);
+    v["tracking_key"] = json!(key);
+    v["log"] = json!(run.log);
+    v["note"] = json!("Use summary_file with process_ppk (base_position.ppp_summary). With several systems, ask the user which one to use (ppp_system).");
+    Ok(v)
+}
+
 fn base_args(args: &Value) -> anyhow::Result<Result<Vec<String>, Value>> {
     let Some(bp) = args.get("base_position").filter(|v| v.is_object()) else {
         return Ok(Err(needs(
@@ -406,8 +520,8 @@ fn base_args(args: &Value) -> anyhow::Result<Result<Vec<String>, Value>> {
             "the base coordinates are not given",
             vec![question(
                 "base_position",
-                "Where do the base coordinates come from: a CSRS-PPP summary (.sum file), known coordinates (latitude, longitude, ellipsoidal height, with their frame and epoch), or the approximate RINEX header position (relative work only)?",
-                &["ppp_summary", "known coordinates", "rinex_header"],
+                "Where do the base coordinates come from: a CSRS-PPP summary (.sum file), a submission of the base RINEX to CSRS-PPP (submit_ppp), known coordinates (latitude, longitude, ellipsoidal height, with their frame and epoch), or the approximate RINEX header position (relative work only)?",
+                &["ppp_summary", "submit_ppp", "known coordinates", "rinex_header"],
             )],
         )));
     };

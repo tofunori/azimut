@@ -4,6 +4,13 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Added
+- The CSRS-PPP e-mail is asked in the terminal when it is missing, and remembered in Azimut's
+  settings (`config.json`, folder overridable with `AZIMUT_CONFIG_DIR`).
+- MCP tool `submit_ppp`: sends a base RINEX to CSRS-PPP after the user's confirmation, asks
+  for the account e-mail once, and returns the summary for `process_ppk` (`resume` for a
+  submission that outlasts the wait).
+
 ## [0.2.0] - 2026-10-24
 
 ### Added

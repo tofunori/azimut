@@ -48,14 +48,16 @@ azimut process /path/to/campaign --rtklib /path/to/rtklib/bin \
     --base /path/to/base.26o --base-ppp /path/to/12345678.sum --antex igs20.atx --out results
 ```
 
-Azimut can also submit the RINEX itself, with the e-mail of your CSRS-PPP account
-(`--email` or the `AZIMUT_CSRS_EMAIL` variable). `azimut ppp` submits, waits (every 10 s, at
+Azimut can also submit the RINEX itself, with the e-mail of your CSRS-PPP account:
+`--email` or the `AZIMUT_CSRS_EMAIL` variable, else the one remembered in Azimut's settings.
+Without any, Azimut asks for it in the terminal and remembers it in `config.json` (in
+`~/Library/Application Support/azimut` on macOS, `%APPDATA%\azimut` on Windows,
+`$XDG_CONFIG_HOME/azimut` or `~/.config/azimut` on Linux, or `AZIMUT_CONFIG_DIR`; readable by its owner only). `azimut ppp` submits, waits (every 10 s, at
 most `--ppp-timeout` minutes, 15 by default) and saves the results archive and its files
 (summary, positions, PDF report); `process --submit-ppp` does the same with the base RINEX of
 the flights, keeps the results in `<out>/csrs_ppp` and goes on as with `--base-ppp`:
 
 ```sh
-export AZIMUT_CSRS_EMAIL=you@example.org
 azimut ppp /path/to/base.26o --out results/csrs_ppp       # ITRF by default; --sysref nad83
 azimut process /path/to/campaign --base /path/to/base.26o --submit-ppp --antex igs20.atx --out results
 ```

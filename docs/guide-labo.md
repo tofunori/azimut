@@ -37,8 +37,9 @@ Il faut :
   ce même RINEX.
 
 Azimut peut aussi soumettre lui-même le RINEX de la base à CSRS-PPP et attendre le résultat
-(environ une minute) : donner le courriel du compte CSRS-PPP une fois pour toutes dans la
-variable `AZIMUT_CSRS_EMAIL`, puis remplacer `--base-ppp …` par `--submit-ppp` à l'étape 2.
+(quelques minutes) : remplacer `--base-ppp …` par `--submit-ppp` à l'étape 2. À la première
+soumission, Azimut demande le courriel du compte CSRS-PPP et le retient pour les suivantes
+(`--email` ou la variable `AZIMUT_CSRS_EMAIL` le remplacent).
 Le rapport de CSRS-PPP (`.sum`, `.pdf`…) est gardé dans `D:\resultats\csrs_ppp`. Pour
 seulement obtenir la position de la base : `azimut ppp D:\base\base.24o --out D:\base\ppp`.
 
