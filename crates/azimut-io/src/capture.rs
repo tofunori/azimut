@@ -1,7 +1,7 @@
 //! Grouping images into captures (one trigger of the camera).
 //!
 //! A Mavic 3M trigger writes one RGB JPEG and four band TIFFs that share the XMP
-//! `CaptureUUID`. Images are grouped on that UUID first; when it is missing, on the sequence
+//! `CaptureUUID`, sometimes with a JPEG from the multispectral camera (`_F.JPG`). Images are grouped on that UUID first; when it is missing, on the sequence
 //! number in the DJI file name. Band identity comes from XMP `BandName`, the file name only
 //! serves as a fallback. See SOURCES.md (Mavic 3M).
 
@@ -30,8 +30,15 @@ pub struct Capture {
     pub exposure_clock_s: Option<f64>,
     /// Smallest sequence number among members.
     pub sequence: Option<u32>,
+    /// RGB JPEGs; the multispectral camera's JPEGs are counted in `ms_jpegs`.
     pub jpegs: usize,
+    #[serde(default)]
+    pub ms_jpegs: usize,
     pub bands: Vec<Band>,
+    /// Earliest exposure clock reading of the bands, for files of the multispectral camera
+    /// that carry none.
+    #[serde(default)]
+    pub band_clock_s: Option<f64>,
     /// Largest spread of exposure clock readings among members, seconds.
     pub clock_spread_s: f64,
 }
@@ -88,7 +95,9 @@ pub fn group(photos: &[Photo]) -> Vec<Capture> {
 
 fn build(photos: &[Photo], members: Vec<usize>, key: GroupKey) -> Capture {
     let mut jpegs = 0;
+    let mut ms_jpegs = 0;
     let mut bands = Vec::new();
+    let mut band_times = Vec::new();
     let mut jpeg_time = None;
     let mut times = Vec::new();
     for &i in &members {
@@ -100,7 +109,11 @@ fn build(photos: &[Photo], members: Vec<usize>, key: GroupKey) -> Capture {
                     jpeg_time = p.exposure_clock_s;
                 }
             }
-            ImageKind::Band(b) => bands.push(b.clone()),
+            ImageKind::Band(b) => {
+                bands.push(b.clone());
+                band_times.extend(p.exposure_clock_s);
+            }
+            ImageKind::MsJpeg => ms_jpegs += 1,
             ImageKind::Tiff => {}
         }
         if let Some(t) = p.exposure_clock_s {
@@ -123,7 +136,9 @@ fn build(photos: &[Photo], members: Vec<usize>, key: GroupKey) -> Capture {
         exposure_clock_s,
         sequence,
         jpegs,
+        ms_jpegs,
         bands,
+        band_clock_s: band_times.into_iter().reduce(f64::min),
         clock_spread_s,
     }
 }

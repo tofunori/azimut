@@ -51,6 +51,11 @@ enum Command {
     },
     /// Scan, then run PPK (RTKLIB-EX) and write camera positions for every flight.
     #[command(group(ArgGroup::new("ppp_source").args(["base_ppp", "submit_ppp"])))]
+    #[command(group(
+        ArgGroup::new("base_source")
+            .args(["base_llh", "base_ppp", "submit_ppp", "approximate_base"])
+            .required(true)
+    ))]
     Process {
         /// Folder to process: an SD card copy, a mission folder or a whole campaign.
         dir: PathBuf,
@@ -58,7 +63,7 @@ enum Command {
         #[arg(long)]
         base: Vec<PathBuf>,
         /// Known base mark coordinates: latitude,longitude,ellipsoidal height (degrees, m).
-        /// Without it the approximate position in the base RINEX header is used.
+        /// One of --base-llh, --base-ppp, --submit-ppp or --approximate-base is required.
         #[arg(long, value_name = "LAT,LON,H")]
         base_llh: Option<String>,
         /// Reference frame and epoch of --base-llh, written into every output row,
@@ -84,6 +89,11 @@ enum Command {
         /// would. Needs --email; the results are kept in <out>/csrs_ppp.
         #[arg(long, conflicts_with_all = ["base_ppp", "base_llh", "antenna_height", "antenna_type"])]
         submit_ppp: bool,
+        /// Use the approximate base position written in the RINEX header (often only
+        /// metre-level): positions are then precise relative to each other, not in absolute
+        /// terms. For tests and relative work only.
+        #[arg(long)]
+        approximate_base: bool,
         #[command(flatten)]
         csrs: CsrsArgs,
         /// Reference system to take from the CSRS-PPP summary when it holds several.
@@ -284,6 +294,7 @@ fn main() -> Result<()> {
             antenna_type,
             base_ppp,
             submit_ppp,
+            approximate_base,
             csrs,
             ppp_system,
             antex,
@@ -336,6 +347,7 @@ fn main() -> Result<()> {
                 }
                 _ => {
                     let position = match &base_llh {
+                        _ if approximate_base => BasePosition::RinexHeader,
                         Some(t) => {
                             let [lat_deg, lon_deg, h_ell_m] = triplet(t, "--base-llh", "LAT,LON,H")?;
                             BasePosition::Llh {
@@ -344,7 +356,8 @@ fn main() -> Result<()> {
                                 h_ell_m,
                             }
                         }
-                        None => BasePosition::RinexHeader,
+                        // clap requires one base source.
+                        None => unreachable!("no base source"),
                     };
                     let frame = frame.unwrap_or_else(|| match position {
                         BasePosition::RinexHeader => "approximate (base RINEX header position)".into(),
@@ -352,8 +365,8 @@ fn main() -> Result<()> {
                     });
                     if position == BasePosition::RinexHeader {
                         println!(
-                            "\nNote: no --base-llh or --base-ppp given. The base RINEX header position is \
-                             often only metre-level:"
+                            "\nNote: --approximate-base. The base RINEX header position is often only \
+                             metre-level:"
                         );
                         println!(
                             "      positions are precise relative to each other, not in absolute terms."

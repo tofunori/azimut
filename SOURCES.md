@@ -30,6 +30,7 @@ or interface text of closed-source tools as a source.
 | Rule | Where | Source |
 |---|---|---|
 | One trigger writes 1 RGB JPEG + 4 TIFF bands (Green, Red, RedEdge, NIR), sharing `CaptureUUID` | `capture.rs` | [Mavic 3M Image Processing Guide](https://dl.djicdn.com/downloads/DJI_Mavic_3_Enterprise/20230829/Mavic_3M_Image_Processing_Guide_EN.pdf); [Pix4D support](https://support.pix4d.com/hc/en-us/articles/36000014121991) |
+| A Mavic 3M trigger can also write `_F.JPG` (2592×1944), a JPEG from the multispectral camera: XMP `ImageSource` = `MS_CAMERA`, same `CaptureUUID`, no `UTCAtExposure` | `photo.rs`, `capture.rs`, `pipeline.rs` (placed at the bands' exposure time) | Own measurement: Mavic 3M, 6 October 2026 flight (Kangiqsujuaq, calibration panel), 3 captures, XMP read from the files |
 | Band from XMP `BandName`, value `RedEdge` without a space; file names vary (`_MS_G` or `_G`) | `photo.rs` | [m3m_radcal SPEC.md](https://github.com/Eggpl4ntE4ter/m3m_radcal/blob/main/docs/SPEC.md); [uav_pytools](https://github.com/Jeff-Tracey/uav_pytools) |
 | Group on `CaptureUUID`, fall back on file names | `capture.rs` | [OpenDroneMap photo.py](https://raw.githubusercontent.com/OpenDroneMap/ODM/master/opendm/photo.py) |
 | MRK has one line per RGB photo (captures), not per file | `matching.rs` | [Emlid community](https://community.emlid.com/t/ppk-processing-of-multispectral-drone-data/39286); [DJI Terra accuracy notes](https://terra.dji.com/user-manual/ko/accuracy-whitepaper/photogrammetry-accuracy.html) |

@@ -437,6 +437,17 @@ fn diagnose(f: &mut Flight) {
                 ),
             ));
         }
+        let with_ms_jpeg = ms.iter().filter(|c| c.ms_jpegs > 0).count();
+        if with_ms_jpeg > 0 {
+            out.push(finding(
+                Severity::Info,
+                "m3m_ms_jpeg",
+                format!(
+                    "{with_ms_jpeg} multispectral capture(s) also hold a JPEG from the multispectral \
+                     camera (_F.JPG); it is positioned at the bands' exposure time."
+                ),
+            ));
+        }
         let spread = ms.iter().map(|c| c.clock_spread_s).fold(0.0, f64::max);
         if spread > 0.01 {
             out.push(finding(

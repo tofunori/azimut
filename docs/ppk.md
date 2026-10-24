@@ -86,9 +86,10 @@ The RINEX given with `--base` must be the one submitted (Azimut warns when the n
 antenna offsets differ). `--ppp-system` picks the system when a summary holds several.
 CSRS-PPP's orthometric height is printed but outputs stay ellipsoidal.
 
-Coordinates are in the frame of the base coordinates you give. Without `--base-llh`, the
-approximate position from the base RINEX header is used: positions are then precise
-relative to each other but not in absolute terms. Heights are ellipsoidal; `--geoid` adds
+Coordinates are in the frame of the base coordinates you give. `process` needs one source
+for them: `--base-llh`, `--base-ppp` or `--submit-ppp`. `--approximate-base` takes the
+approximate position from the base RINEX header instead, for tests and relative work:
+positions are then precise relative to each other but not in absolute terms. Heights are ellipsoidal; `--geoid` adds
 orthometric heights (see [CGVD2013 heights](heights.md)).
 
 Defaults for DJI aircraft: L1+L2, GPS + GLONASS + Galileo + BeiDou, 15° mask, continuous

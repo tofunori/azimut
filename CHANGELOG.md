@@ -8,6 +8,16 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 - The igs20.atx models of the Emlid Reach RS2, RS2+ and RS3 are embedded: a base on one of
   these antennas positioned by CSRS-PPP no longer needs `--antex`.
 
+### Changed
+- `process` refuses to run without a base position source: `--base-llh`, `--base-ppp` or
+  `--submit-ppp`. The approximate RINEX header position, used silently before, now needs
+  `--approximate-base`.
+
+### Fixed
+- Mavic 3M captures that also hold the multispectral camera's JPEG (`_F.JPG`) were reported
+  incomplete (2 JPEG) and that file was placed at the MRK time. It now has its own role
+  (`ms_jpeg`) and is positioned at the bands' exposure time.
+
 ## [0.2.0] - 2026-10-24
 
 ### Added
