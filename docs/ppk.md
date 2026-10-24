@@ -74,8 +74,13 @@ point CSRS-PPP estimated:
 | CSRS-PPP summary | The coordinates are | Azimut sets |
 |---|---|---|
 | `ANT NOT FOUND`, `ARP 0 0 0` | the antenna phase centre (no antenna type or height in the RINEX) | no antenna height, no antenna type; warns that this point is not the ground mark |
-| antenna found, `ARP 0 0 0` | the antenna reference point | antenna type, no height; requires `--antex` |
-| `ARP` offsets applied | the ground mark | type and offsets from the RINEX header, as CSRS-PPP did; requires `--antex` if the antenna was found |
+| antenna found, `ARP 0 0 0` | the antenna reference point | antenna type, no height; requires `--antex`, except for the embedded antennas below |
+| `ARP` offsets applied | the ground mark | type and offsets from the RINEX header, as CSRS-PPP did; requires `--antex` if the antenna was found, except for the embedded antennas below |
+
+Azimut embeds the igs20.atx models of the Emlid Reach RS2, RS2+ and RS3. When CSRS-PPP
+applied one of them and no `--antex` is given, Azimut writes them to `results/work/` and
+RTKLIB uses them for the base antenna; `--antex` replaces them. Other antennas still need
+`--antex` (igs20.atx from [files.igs.org](https://files.igs.org/pub/station/general/igs20.atx)).
 
 The RINEX given with `--base` must be the one submitted (Azimut warns when the name or the
 antenna offsets differ). `--ppp-system` picks the system when a summary holds several.

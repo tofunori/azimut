@@ -82,6 +82,13 @@ Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](
 | Summary files hold the position in more than one system; the `.pos` file only in the one selected | `csrs_ppp.rs` (`--ppp-system`) | [Krcmar, CSRS-PPP: a web tool](https://krcmar.ca/resource-articles/2010_Winter_CSRS-PPP%20-%20A%20web%20tool_0.pdf) |
 | CSRS-PPP estimates the antenna phase centre and reduces it to the mark with the antenna calibration and the RINEX `ANTENNA: DELTA H/E/N` offsets, which the user must check | `config.rs` (`BaseSetup::from_ppp`) | [NRCan, Guidelines for RTK/RTN GNSS Surveying in Canada](https://natural-resources.canada.ca/sites/www.nrcan.gc.ca/files/earthsciences/pdf/Canada%20RTK_UserGuide_v1_2-EN.pdf); [Emlid forum, no antenna type in RINEX](https://community.emlid.com/t/rs2-ppp-problem-no-antenna-type-in-rinex-header/21106) |
 
+## ANTEX
+
+| Rule | Where in the code | Source |
+|---|---|---|
+| Emlid Reach RS2, RS2+ and RS3 receiver antenna models (`EML_REACH_RS2   NONE`, `EML_REACH_RS2+  NONE`, `EML_REACH_RS3   NONE`), copied unchanged; RS2 calibrated by Geoscience Australia (robot, 2022), RS2+ and RS3 copied from RS2 by the IGS | `antex.rs`, `data/emlid_igs20.atx` | [IGS igs20.atx](https://files.igs.org/pub/station/general/igs20.atx), last change week 2438, downloaded 2026-10-23, SHA-256 `0cd58d0d9ee678d5586de6c01f576e5aceb86f4a0735a168f733dfd091c0a614` |
+| The embedded file holds receiver antennas only and is given to RTKLIB as `file-rcvantfile` alone; in Azimut's kinematic PPK this gives the same positions as the full igs20.atx as both files | `config.rs` (`receiver_antex`) | Own measurement: Mavic 3M flight of 6 October 2026, Emlid RS2 base positioned by CSRS-PPP, 73 files, identical latitude, longitude and height with either file |
+
 ## CSRS-PPP service
 
 | Rule | Where | Source |

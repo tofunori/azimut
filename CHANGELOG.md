@@ -4,6 +4,10 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Added
+- The igs20.atx models of the Emlid Reach RS2, RS2+ and RS3 are embedded: a base on one of
+  these antennas positioned by CSRS-PPP no longer needs `--antex`.
+
 ## [0.2.0] - 2026-10-24
 
 ### Added

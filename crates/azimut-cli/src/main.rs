@@ -89,7 +89,9 @@ enum Command {
         /// Reference system to take from the CSRS-PPP summary when it holds several.
         #[arg(long, value_name = "SYSTEM", requires = "ppp_source")]
         ppp_system: Option<String>,
-        /// ANTEX file with antenna phase-centre models (e.g. igs20.atx).
+        /// ANTEX file with antenna phase-centre models (e.g. igs20.atx). Without it, the
+        /// embedded igs20.atx models of the Emlid Reach RS2, RS2+ and RS3 are used when
+        /// CSRS-PPP applied one of them.
         #[arg(long)]
         antex: Option<PathBuf>,
         /// Folder holding RTKLIB-EX convbin and rnx2rtkp (else AZIMUT_RTKLIB_DIR, then PATH).
@@ -370,6 +372,16 @@ fn main() -> Result<()> {
             } else {
                 PpkConfig::dji()
             };
+            // CSRS-PPP applied a model the embedded ones hold: give it to RTKLIB.
+            if antex.is_none() {
+                if let Some(ant) = ppp.as_ref().and_then(BaseSetup::ppp_embedded_antenna) {
+                    let path = azimut_solve::antex::write_embedded(&out.join("work")).with_context(|| {
+                        format!("writing the embedded antenna models into {}", out.display())
+                    })?;
+                    println!("   antenna model: {ant} from the embedded igs20.atx entries");
+                    ppk.receiver_antex = Some(path);
+                }
+            }
             ppk.antex = antex;
             let opts = ProcessOptions {
                 ppk,
