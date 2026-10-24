@@ -10,6 +10,8 @@ use serde_json::{json, Value};
 
 struct Server {
     child: Child,
+    // Settings folder of this server, so the user's own settings are never read.
+    _settings: tempfile::TempDir,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
     next_id: u64,
@@ -17,8 +19,11 @@ struct Server {
 
 impl Server {
     fn start() -> Self {
+        let settings = tempfile::tempdir().unwrap();
         let mut child = Command::new(env!("CARGO_BIN_EXE_azimut"))
             .arg("mcp")
+            .env("AZIMUT_CONFIG_DIR", settings.path())
+            .env_remove("AZIMUT_CSRS_EMAIL")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -28,6 +33,7 @@ impl Server {
         let stdout = BufReader::new(child.stdout.take().unwrap());
         Server {
             child,
+            _settings: settings,
             stdin,
             stdout,
             next_id: 1,

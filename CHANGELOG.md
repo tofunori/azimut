@@ -5,6 +5,11 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 ## [Unreleased]
 
 ### Added
+- The CSRS-PPP e-mail is asked in the terminal when it is missing, and remembered in Azimut's
+  settings (`config.json`, folder overridable with `AZIMUT_CONFIG_DIR`).
+- MCP tool `submit_ppp`: sends a base RINEX to CSRS-PPP after the user's confirmation, asks
+  for the account e-mail once, and returns the summary for `process_ppk` (`resume` for a
+  submission that outlasts the wait).
 - The igs20.atx models of the Emlid Reach RS2, RS2+ and RS3 are embedded: a base on one of
   these antennas positioned by CSRS-PPP no longer needs `--antex`.
 
