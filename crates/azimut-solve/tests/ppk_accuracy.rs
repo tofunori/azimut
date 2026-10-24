@@ -18,8 +18,10 @@ use azimut_solve::geodesy::{cov_ecef_to_enu, ecef_to_geodetic, enu_basis};
 use azimut_solve::pos::{self, SolQuality};
 use azimut_solve::{BaseSetup, PpkConfig, Rtklib};
 
-/// Mid-window epoch, 2025-06-29 15:30 GPST, as a decimal year.
-const EPOCH: f64 = 2025.0 + (179.0 + 15.5 / 24.0) / 365.0;
+/// Mid-window epoch, 2025-06-29 15:07 GPST, as a decimal year.
+const EPOCH: f64 = 2025.0 + (179.0 + 15.125 / 24.0) / 365.0;
+/// Epochs in the fixture: 15 minutes at 1 s.
+const EPOCHS: usize = 900;
 
 /// ITRF2020 antenna reference point at epoch 2020.0 and velocity (m, m/yr), from the NGS
 /// coordinate files `mils_20.coord.txt` and `misr_20.coord.txt`.
@@ -34,7 +36,7 @@ const MISR: ([f64; 3], [f64; 3]) = (
 
 /// Acceptance thresholds. A dual-frequency RTK receiver is specified at 8 mm + 1 ppm
 /// horizontal and 15 mm + 1 ppm vertical (1-sigma, typical manufacturer figures); at 4.8 km
-/// that is 1.3 cm and 2.0 cm. The thresholds leave room for the 30 s data and one hour.
+/// that is 1.3 cm and 2.0 cm.
 const MIN_FIX_RATE: f64 = 0.90;
 /// Mean error of the fixed epochs, per axis: a bias here would be a setup error (frame,
 /// base position, antenna) that every flight would carry.
@@ -73,6 +75,9 @@ fn rtklib() -> Option<Rtklib> {
 }
 
 fn percentile(v: &mut [f64], p: f64) -> f64 {
+    if v.is_empty() {
+        return f64::NAN;
+    }
     v.sort_by(f64::total_cmp);
     v[((v.len() - 1) as f64 * p).round() as usize]
 }
@@ -93,8 +98,8 @@ fn cors_baseline_matches_published_coordinates() {
     let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/cors-2025-180");
     let tmp = tempfile::tempdir().unwrap();
     let [base_obs, rover_obs, gps_nav, glo_nav] = [
-        "mils1800.25o.gz",
-        "misr1800.25o.gz",
+        "mils180p.25o.gz",
+        "misr180p.25o.gz",
         "brdc1800.25n.gz",
         "brdc1800.25g.gz",
     ]
@@ -127,7 +132,7 @@ fn cors_baseline_matches_published_coordinates() {
     let (lat, lon, _) = ecef_to_geodetic(truth);
     let enu = enu_basis(lat, lon);
     let fixed: Vec<_> = traj.iter().filter(|e| e.quality == SolQuality::Fixed).collect();
-    let fix_rate = fixed.len() as f64 / 120.0;
+    let fix_rate = fixed.len() as f64 / EPOCHS as f64;
     assert!(!fixed.is_empty(), "no fixed epoch out of {}", traj.len());
 
     let (mut de, mut dn, mut du, mut dh, mut ze, mut zn, mut zu) =
@@ -141,9 +146,12 @@ fn cors_baseline_matches_published_coordinates() {
         du.push(z);
         dh.push(x.hypot(y));
         // Error over RTKLIB's own 1-sigma: about 1 if its uncertainties are realistic.
-        ze.push((x / c[0][0].sqrt()).abs());
-        zn.push((y / c[1][1].sqrt()).abs());
-        zu.push((z / c[2][2].sqrt()).abs());
+        // RTKLIB writes 0 for a negative variance: such epochs have no usable sigma.
+        if c[0][0] > 0.0 && c[1][1] > 0.0 && c[2][2] > 0.0 {
+            ze.push((x / c[0][0].sqrt()).abs());
+            zn.push((y / c[1][1].sqrt()).abs());
+            zu.push((z / c[2][2].sqrt()).abs());
+        }
     }
     let (bias_e, bias_n, bias_u) = (mean(&de), mean(&dn), mean(&du));
     let (rms_h, rms_u) = ((rms(&de).powi(2) + rms(&dn).powi(2)).sqrt(), rms(&du));
@@ -152,9 +160,9 @@ fn cors_baseline_matches_published_coordinates() {
     let max_h = dh.last().copied().unwrap_or(0.0);
     let max_u = du.iter().fold(0.0_f64, |m, x| m.max(x.abs()));
     let cm = |m: f64| format!("{:+.2} cm", m * 100.0);
-    println!("MISR against MILS (4.8 km), 2025-06-29 15:00-16:00 GPST, 30 s");
+    println!("MISR against MILS (4.8 km), 2025-06-29 15:00-15:15 GPST, 1 s");
     println!(
-        "epochs: {} solved, {} fixed of 120 ({:.1} %)",
+        "epochs: {} solved, {} fixed of {EPOCHS} ({:.1} %)",
         traj.len(),
         fixed.len(),
         fix_rate * 100.0
@@ -175,7 +183,8 @@ fn cors_baseline_matches_published_coordinates() {
         cm(max_u)
     );
     println!(
-        "median |error| / RTKLIB 1-sigma E / N / U: {:.1} / {:.1} / {:.1}",
+        "median |error| / RTKLIB 1-sigma E / N / U ({} epochs with a usable covariance): {:.1} / {:.1} / {:.1}",
+        ze.len(),
         percentile(&mut ze, 0.5),
         percentile(&mut zn, 0.5),
         percentile(&mut zu, 0.5)
