@@ -4,6 +4,10 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Added
+- The igs20.atx models of the Emlid Reach RS2, RS2+ and RS3 are embedded: a base on one of
+  these antennas positioned by CSRS-PPP no longer needs `--antex`.
+
 ### Changed
 - `process` refuses to run without a base position source: `--base-llh`, `--base-ppp` or
   `--submit-ppp`. The approximate RINEX header position, used silently before, now needs

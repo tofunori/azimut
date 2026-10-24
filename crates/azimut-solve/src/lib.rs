@@ -4,6 +4,7 @@
 //!
 //! - [`rtklib`]: run RTKLIB-EX `convbin` (raw RTCM 3 to RINEX) and `rnx2rtkp` (PPK).
 //! - [`config`]: processing options written as an RTKLIB options file.
+//! - [`antex`]: Emlid receiver antenna models embedded from igs20.atx.
 //! - [`pos`]: read RTKLIB ECEF solutions with their full covariance.
 //! - [`camera`]: interpolate the antenna to each exposure and apply the MRK lever arm.
 //! - [`geodesy`]: GRS80 conversions and ENU rotations.
@@ -12,6 +13,7 @@
 
 use std::path::{Path, PathBuf};
 
+pub mod antex;
 pub mod camera;
 pub mod config;
 pub mod geodesy;
