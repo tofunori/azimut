@@ -4,9 +4,20 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-24
+
 ### Added
+- CSRS-PPP submission of the base RINEX from Azimut (`ppp`, `process --submit-ppp`): waits
+  for the result, keeps the archive, resumes with the tracking key (`ppp --resume`), and
+  prints the service's warnings (`errors.txt`) under the position.
 - Project website on GitHub Pages (French and English), with the example quality reports
   viewable online (`site/`, `scripts/build-site.sh`).
+
+### Fixed
+- The ambiguity fixing rate of CSRS-PPP 5.15 summaries (per-constellation `IAR` lines, then
+  `IAR ALL`) was reported as missing.
+- Release builds: the RTKLIB-EX commit is quoted so YAML keeps it a string, and MinGW
+  builds define `WIN32`.
 
 ## [0.1.0] - 2026-10-23
 
@@ -17,8 +28,6 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
   interpolated to each file's own exposure time, MRK lever arm.
 - Base position from an NRCan CSRS-PPP summary (`--base-ppp`); RTK flights corrected by a
   base shift (`shift`, `--to-ppp`).
-- CSRS-PPP submission of the base RINEX from Azimut (`ppp`, `process --submit-ppp`): waits
-  for the result, keeps the archive, resumes with the tracking key (`ppp --resume`).
 - CGVD2013 orthometric heights from PROJ geoid grids (`--geoid`), with a frame check.
 - Outputs: positions CSV, OpenDroneMap `geo.txt`, PIX4Dmatic geolocation file, problems list.
 - Quality report in HTML and JSON, in English or French (`--report-lang fr`).
