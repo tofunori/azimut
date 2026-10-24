@@ -62,6 +62,10 @@ pub enum ImageKind {
     Band(Band),
     /// A TIFF without a recognised band.
     Tiff,
+    /// A JPEG from the Mavic 3M multispectral camera (`_F.JPG`, XMP `ImageSource` =
+    /// `MS_CAMERA`), written beside the bands. It has no `UTCAtExposure`; it shares the
+    /// bands' exposure.
+    MsJpeg,
 }
 
 /// Metadata of one image file.
@@ -162,9 +166,15 @@ pub fn read_photo(path: &Path) -> Photo {
                 None
             }
         });
+    // The file name suffix only serves when the XMP does not name the camera.
+    let ms_jpeg = match fields.get_local("ImageSource") {
+        Some(s) => s.eq_ignore_ascii_case("MS_CAMERA"),
+        None => suffix.as_deref() == Some("F"),
+    };
     let kind = match (band, tiff) {
         (Some(b), _) => ImageKind::Band(b),
         (None, true) => ImageKind::Tiff,
+        (None, false) if ms_jpeg => ImageKind::MsJpeg,
         (None, false) => ImageKind::Jpeg,
     };
     let exposure_raw = fields.get_local("UTCAtExposure").map(str::to_string);

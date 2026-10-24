@@ -559,6 +559,7 @@ fn base_args(args: &Value) -> anyhow::Result<Result<Vec<String>, Value>> {
         return Ok(Ok(v));
     }
     if bp.get("rinex_header").and_then(Value::as_bool) == Some(true) {
+        v.push("--approximate-base".into());
         return Ok(Ok(v));
     }
     anyhow::bail!("base_position must hold ppp_summary, or lat, lon, h and frame, or rinex_header: true")
@@ -876,4 +877,20 @@ fn run_and_report(
         }
     }
     Ok(json!({ "status": run.status(), "reports": reports, "log": run.log }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base_position_becomes_a_process_base_source() {
+        let args = |bp: Value| base_args(&json!({ "base_position": bp })).unwrap().unwrap();
+        assert_eq!(args(json!({ "rinex_header": true })), ["--approximate-base"]);
+        assert_eq!(args(json!({ "ppp_summary": "b.sum" })), ["--base-ppp", "b.sum"]);
+        assert_eq!(
+            args(json!({ "lat": 46.0, "lon": -72.0, "h": 30.0, "frame": "ITRF2020" }))[0],
+            "--base-llh"
+        );
+    }
 }

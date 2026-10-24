@@ -59,7 +59,8 @@ impl BaseSetup {
     /// - Antenna not found, no offsets: the coordinates are the uncalibrated antenna phase
     ///   centre, so the base gets no antenna height and no antenna type.
     /// - Antenna found, no offsets: the antenna reference point; the antenna type is passed
-    ///   on and an ANTEX file is required so RTKLIB applies the same phase-centre offsets.
+    ///   on and an ANTEX file is required so RTKLIB applies the same phase-centre offsets
+    ///   (the embedded models do for the antennas they hold, see [`crate::antex`]).
     /// - Offsets applied: the mark; type and offsets are read from the same RINEX header
     ///   CSRS-PPP used (`ant2-anttype=*`), with the same ANTEX requirement if the antenna
     ///   was found.
@@ -80,7 +81,7 @@ impl BaseSetup {
             h_ell_m: p.h_ell_m,
         };
         let need_antex = |ant: &str| {
-            if antex_given {
+            if antex_given || crate::antex::is_embedded(ant) {
                 Ok(())
             } else {
                 Err(format!(
@@ -128,6 +129,13 @@ impl BaseSetup {
             point,
         ))
     }
+
+    /// The antenna whose phase-centre model CSRS-PPP applied, when the embedded models hold
+    /// it: RTKLIB then needs them if no ANTEX file is given.
+    pub fn ppp_embedded_antenna(sum: &PppSummary) -> Option<&str> {
+        let ant = sum.antenna.as_deref()?;
+        (sum.point() != PppPoint::PhaseCentre && crate::antex::is_embedded(ant)).then_some(ant)
+    }
 }
 
 /// GNSS systems to process.
@@ -170,6 +178,9 @@ pub struct PpkConfig {
     pub base_time_interpolation: bool,
     /// ANTEX file for satellite and receiver antenna corrections.
     pub antex: Option<PathBuf>,
+    /// ANTEX file for receiver antennas only (the embedded models). Ignored when `antex` is
+    /// set.
+    pub receiver_antex: Option<PathBuf>,
     /// Extra `key=value` options appended last (they override the ones above).
     pub extra: Vec<(String, String)>,
 }
@@ -199,6 +210,7 @@ impl PpkConfig {
             beidou_ar: true,
             base_time_interpolation: true,
             antex: None,
+            receiver_antex: None,
             extra: Vec::new(),
         }
     }
@@ -277,6 +289,8 @@ impl PpkConfig {
         if let Some(a) = &self.antex {
             kv("file-satantfile", &a.display().to_string());
             kv("file-rcvantfile", &a.display().to_string());
+        } else if let Some(a) = &self.receiver_antex {
+            kv("file-rcvantfile", &a.display().to_string());
         }
         for (k, v) in &self.extra {
             kv(k, v);
@@ -324,6 +338,28 @@ mod tests {
         let (b, _) = BaseSetup::from_ppp(&s, None, true).unwrap();
         assert_eq!(b.antenna_type.as_deref(), Some("TRM59800.00     NONE"));
         assert_eq!(b.antenna_height_m, Some(0.0));
+    }
+
+    #[test]
+    fn ppp_with_embedded_antenna_needs_no_antex() {
+        let s = ppp("EML_REACH_RS2   NONE", "0 0 0");
+        let (b, _) = BaseSetup::from_ppp(&s, None, false).unwrap();
+        assert_eq!(b.antenna_type.as_deref(), Some("EML_REACH_RS2   NONE"));
+        assert_eq!(BaseSetup::ppp_embedded_antenna(&s), Some("EML_REACH_RS2   NONE"));
+        assert_eq!(
+            BaseSetup::ppp_embedded_antenna(&ppp("TRM59800.00     NONE", "0 0 0")),
+            None
+        );
+        assert_eq!(BaseSetup::ppp_embedded_antenna(&ppp("NOT FOUND", "0 0 0")), None);
+
+        let mut ppk = PpkConfig::dji();
+        ppk.receiver_antex = Some(PathBuf::from("work/emlid_igs20.atx"));
+        let conf = ppk.to_conf(&b);
+        assert!(conf.contains("file-rcvantfile   =work/emlid_igs20.atx"), "{conf}");
+        assert!(!conf.contains("file-satantfile"));
+        ppk.antex = Some(PathBuf::from("igs20.atx"));
+        let conf = ppk.to_conf(&b);
+        assert!(conf.contains("file-rcvantfile   =igs20.atx"));
     }
 
     #[test]

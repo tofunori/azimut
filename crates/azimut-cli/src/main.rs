@@ -52,6 +52,11 @@ enum Command {
     },
     /// Scan, then run PPK (RTKLIB-EX) and write camera positions for every flight.
     #[command(group(ArgGroup::new("ppp_source").args(["base_ppp", "submit_ppp"])))]
+    #[command(group(
+        ArgGroup::new("base_source")
+            .args(["base_llh", "base_ppp", "submit_ppp", "approximate_base"])
+            .required(true)
+    ))]
     Process {
         /// Folder to process: an SD card copy, a mission folder or a whole campaign.
         dir: PathBuf,
@@ -59,7 +64,7 @@ enum Command {
         #[arg(long)]
         base: Vec<PathBuf>,
         /// Known base mark coordinates: latitude,longitude,ellipsoidal height (degrees, m).
-        /// Without it the approximate position in the base RINEX header is used.
+        /// One of --base-llh, --base-ppp, --submit-ppp or --approximate-base is required.
         #[arg(long, value_name = "LAT,LON,H")]
         base_llh: Option<String>,
         /// Reference frame and epoch of --base-llh, written into every output row,
@@ -86,12 +91,19 @@ enum Command {
         /// kept in <out>/csrs_ppp.
         #[arg(long, conflicts_with_all = ["base_ppp", "base_llh", "antenna_height", "antenna_type"])]
         submit_ppp: bool,
+        /// Use the approximate base position written in the RINEX header (often only
+        /// metre-level): positions are then precise relative to each other, not in absolute
+        /// terms. For tests and relative work only.
+        #[arg(long)]
+        approximate_base: bool,
         #[command(flatten)]
         csrs: CsrsArgs,
         /// Reference system to take from the CSRS-PPP summary when it holds several.
         #[arg(long, value_name = "SYSTEM", requires = "ppp_source")]
         ppp_system: Option<String>,
-        /// ANTEX file with antenna phase-centre models (e.g. igs20.atx).
+        /// ANTEX file with antenna phase-centre models (e.g. igs20.atx). Without it, the
+        /// embedded igs20.atx models of the Emlid Reach RS2, RS2+ and RS3 are used when
+        /// CSRS-PPP applied one of them.
         #[arg(long)]
         antex: Option<PathBuf>,
         /// Folder holding RTKLIB-EX convbin and rnx2rtkp (else AZIMUT_RTKLIB_DIR, then PATH).
@@ -284,6 +296,7 @@ fn main() -> Result<()> {
             antenna_type,
             base_ppp,
             submit_ppp,
+            approximate_base,
             csrs,
             ppp_system,
             antex,
@@ -341,6 +354,7 @@ fn main() -> Result<()> {
                 }
                 _ => {
                     let position = match &base_llh {
+                        _ if approximate_base => BasePosition::RinexHeader,
                         Some(t) => {
                             let [lat_deg, lon_deg, h_ell_m] = triplet(t, "--base-llh", "LAT,LON,H")?;
                             BasePosition::Llh {
@@ -349,7 +363,8 @@ fn main() -> Result<()> {
                                 h_ell_m,
                             }
                         }
-                        None => BasePosition::RinexHeader,
+                        // clap requires one base source.
+                        None => unreachable!("no base source"),
                     };
                     let frame = frame.unwrap_or_else(|| match position {
                         BasePosition::RinexHeader => "approximate (base RINEX header position)".into(),
@@ -357,8 +372,8 @@ fn main() -> Result<()> {
                     });
                     if position == BasePosition::RinexHeader {
                         println!(
-                            "\nNote: no --base-llh or --base-ppp given. The base RINEX header position is \
-                             often only metre-level:"
+                            "\nNote: --approximate-base. The base RINEX header position is often only \
+                             metre-level:"
                         );
                         println!(
                             "      positions are precise relative to each other, not in absolute terms."
@@ -377,6 +392,16 @@ fn main() -> Result<()> {
             } else {
                 PpkConfig::dji()
             };
+            // CSRS-PPP applied a model the embedded ones hold: give it to RTKLIB.
+            if antex.is_none() {
+                if let Some(ant) = ppp.as_ref().and_then(BaseSetup::ppp_embedded_antenna) {
+                    let path = azimut_solve::antex::write_embedded(&out.join("work")).with_context(|| {
+                        format!("writing the embedded antenna models into {}", out.display())
+                    })?;
+                    println!("   antenna model: {ant} from the embedded igs20.atx entries");
+                    ppk.receiver_antex = Some(path);
+                }
+            }
             ppk.antex = antex;
             let opts = ProcessOptions {
                 ppk,

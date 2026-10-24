@@ -76,16 +76,22 @@ point CSRS-PPP estimated:
 | CSRS-PPP summary | The coordinates are | Azimut sets |
 |---|---|---|
 | `ANT NOT FOUND`, `ARP 0 0 0` | the antenna phase centre (no antenna type or height in the RINEX) | no antenna height, no antenna type; warns that this point is not the ground mark |
-| antenna found, `ARP 0 0 0` | the antenna reference point | antenna type, no height; requires `--antex` |
-| `ARP` offsets applied | the ground mark | type and offsets from the RINEX header, as CSRS-PPP did; requires `--antex` if the antenna was found |
+| antenna found, `ARP 0 0 0` | the antenna reference point | antenna type, no height; requires `--antex`, except for the embedded antennas below |
+| `ARP` offsets applied | the ground mark | type and offsets from the RINEX header, as CSRS-PPP did; requires `--antex` if the antenna was found, except for the embedded antennas below |
+
+Azimut embeds the igs20.atx models of the Emlid Reach RS2, RS2+ and RS3. When CSRS-PPP
+applied one of them and no `--antex` is given, Azimut writes them to `results/work/` and
+RTKLIB uses them for the base antenna; `--antex` replaces them. Other antennas still need
+`--antex` (igs20.atx from [files.igs.org](https://files.igs.org/pub/station/general/igs20.atx)).
 
 The RINEX given with `--base` must be the one submitted (Azimut warns when the name or the
 antenna offsets differ). `--ppp-system` picks the system when a summary holds several.
 CSRS-PPP's orthometric height is printed but outputs stay ellipsoidal.
 
-Coordinates are in the frame of the base coordinates you give. Without `--base-llh`, the
-approximate position from the base RINEX header is used: positions are then precise
-relative to each other but not in absolute terms. Heights are ellipsoidal; `--geoid` adds
+Coordinates are in the frame of the base coordinates you give. `process` needs one source
+for them: `--base-llh`, `--base-ppp` or `--submit-ppp`. `--approximate-base` takes the
+approximate position from the base RINEX header instead, for tests and relative work:
+positions are then precise relative to each other but not in absolute terms. Heights are ellipsoidal; `--geoid` adds
 orthometric heights (see [CGVD2013 heights](heights.md)).
 
 Defaults for DJI aircraft: L1+L2, GPS + GLONASS + Galileo + BeiDou, 15° mask, continuous

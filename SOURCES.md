@@ -30,6 +30,7 @@ or interface text of closed-source tools as a source.
 | Rule | Where | Source |
 |---|---|---|
 | One trigger writes 1 RGB JPEG + 4 TIFF bands (Green, Red, RedEdge, NIR), sharing `CaptureUUID` | `capture.rs` | [Mavic 3M Image Processing Guide](https://dl.djicdn.com/downloads/DJI_Mavic_3_Enterprise/20230829/Mavic_3M_Image_Processing_Guide_EN.pdf); [Pix4D support](https://support.pix4d.com/hc/en-us/articles/36000014121991) |
+| A Mavic 3M trigger can also write `_F.JPG` (2592×1944), a JPEG from the multispectral camera: XMP `ImageSource` = `MS_CAMERA`, same `CaptureUUID`, no `UTCAtExposure` | `photo.rs`, `capture.rs`, `pipeline.rs` (placed at the bands' exposure time) | Own measurement: Mavic 3M, 6 October 2026 flight (Kangiqsujuaq, calibration panel), 3 captures, XMP read from the files |
 | Band from XMP `BandName`, value `RedEdge` without a space; file names vary (`_MS_G` or `_G`) | `photo.rs` | [m3m_radcal SPEC.md](https://github.com/Eggpl4ntE4ter/m3m_radcal/blob/main/docs/SPEC.md); [uav_pytools](https://github.com/Jeff-Tracey/uav_pytools) |
 | Group on `CaptureUUID`, fall back on file names | `capture.rs` | [OpenDroneMap photo.py](https://raw.githubusercontent.com/OpenDroneMap/ODM/master/opendm/photo.py) |
 | MRK has one line per RGB photo (captures), not per file | `matching.rs` | [Emlid community](https://community.emlid.com/t/ppk-processing-of-multispectral-drone-data/39286); [DJI Terra accuracy notes](https://terra.dji.com/user-manual/ko/accuracy-whitepaper/photogrammetry-accuracy.html) |
@@ -81,6 +82,13 @@ Read from the RTKLIB-EX source code (BSD-2), [github.com/rtklibexplorer/RTKLIB](
 | Version 5.15 writes `IAR` once per constellation (`IAR GPS 89.30%`, `IAR GAL OFF`) and then the total as `IAR ALL 89.30%`; version 4 writes a single `IAR 98.71%` | `csrs_ppp.rs` | Own measurement: first submission from `azimut ppp`, 2026-10-23, version 5.15 (Emlid Reach RS2 base, not committed) |
 | Summary files hold the position in more than one system; the `.pos` file only in the one selected | `csrs_ppp.rs` (`--ppp-system`) | [Krcmar, CSRS-PPP: a web tool](https://krcmar.ca/resource-articles/2010_Winter_CSRS-PPP%20-%20A%20web%20tool_0.pdf) |
 | CSRS-PPP estimates the antenna phase centre and reduces it to the mark with the antenna calibration and the RINEX `ANTENNA: DELTA H/E/N` offsets, which the user must check | `config.rs` (`BaseSetup::from_ppp`) | [NRCan, Guidelines for RTK/RTN GNSS Surveying in Canada](https://natural-resources.canada.ca/sites/www.nrcan.gc.ca/files/earthsciences/pdf/Canada%20RTK_UserGuide_v1_2-EN.pdf); [Emlid forum, no antenna type in RINEX](https://community.emlid.com/t/rs2-ppp-problem-no-antenna-type-in-rinex-header/21106) |
+
+## ANTEX
+
+| Rule | Where in the code | Source |
+|---|---|---|
+| Emlid Reach RS2, RS2+ and RS3 receiver antenna models (`EML_REACH_RS2   NONE`, `EML_REACH_RS2+  NONE`, `EML_REACH_RS3   NONE`), copied unchanged; RS2 calibrated by Geoscience Australia (robot, 2022), RS2+ and RS3 copied from RS2 by the IGS | `antex.rs`, `data/emlid_igs20.atx` | [IGS igs20.atx](https://files.igs.org/pub/station/general/igs20.atx), last change week 2438, downloaded 2026-10-23, SHA-256 `0cd58d0d9ee678d5586de6c01f576e5aceb86f4a0735a168f733dfd091c0a614` |
+| The embedded file holds receiver antennas only and is given to RTKLIB as `file-rcvantfile` alone; in Azimut's kinematic PPK this gives the same positions as the full igs20.atx as both files | `config.rs` (`receiver_antex`) | Own measurement: Mavic 3M flight of 6 October 2026, Emlid RS2 base positioned by CSRS-PPP, 73 files, identical latitude, longitude and height with either file |
 
 ## CSRS-PPP service
 

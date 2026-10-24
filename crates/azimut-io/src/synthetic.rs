@@ -45,6 +45,9 @@ pub struct SyntheticFlight {
     pub with_uuid: bool,
     /// Band exposure time minus JPEG exposure time, seconds (about 0.026 on a real Mavic 3M).
     pub band_delay_s: f64,
+    /// Also write the multispectral camera's JPEG (`_F.JPG`, `ImageSource` = `MS_CAMERA`,
+    /// no `UTCAtExposure`), as a Mavic 3M does with some camera settings.
+    pub ms_jpeg: bool,
     /// Fly a survey pattern (lines of 12 captures back and forth) with standard deviations
     /// that vary along the flight, instead of a straight line with constant ones. For
     /// demonstrations; the tests use the straight line.
@@ -70,6 +73,7 @@ impl Default for SyntheticFlight {
             band_size: (1, 1),
             with_uuid: true,
             band_delay_s: 0.0,
+            ms_jpeg: false,
             survey: false,
         }
     }
@@ -385,6 +389,13 @@ pub fn write_flight(dir: &Path, spec: &SyntheticFlight) -> io::Result<Vec<PathBu
                 let (w, h) = spec.band_size;
                 fs::write(&tif, tiff_with_xmp_gps(&xmp_packet(&attrs), w, h, Some(pos)))?;
                 written.push(tif);
+            }
+            if spec.ms_jpeg {
+                let mut attrs: Vec<(&str, String)> = base[1..].to_vec();
+                attrs.push(("ImageSource", "MS_CAMERA".into()));
+                let f = dir.join(format!("DJI_{stamp}_{index:04}_F.JPG"));
+                fs::write(&f, jpeg_with_xmp_gps(&xmp_packet(&attrs), Some(pos)))?;
+                written.push(f);
             }
         }
 
