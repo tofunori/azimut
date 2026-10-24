@@ -4,6 +4,11 @@ All notable changes. Versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Changed
+- `process` refuses to run without a base position source: `--base-llh`, `--base-ppp` or
+  `--submit-ppp`. The approximate RINEX header position, used silently before, now needs
+  `--approximate-base`.
+
 ### Fixed
 - Mavic 3M captures that also hold the multispectral camera's JPEG (`_F.JPG`) were reported
   incomplete (2 JPEG) and that file was placed at the MRK time. It now has its own role
