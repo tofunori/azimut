@@ -25,3 +25,26 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo test --all --all-features
+
+  ppk-accuracy:
+    # Absolute accuracy of the PPK step against published CORS coordinates
+    # (crates/azimut-solve/tests/ppk_accuracy.rs). Same RTKLIB-EX commit as the release.
+    name: PPK accuracy (RTKLIB-EX)
+    runs-on: ubuntu-latest
+    env:
+      RTKLIB_REPO: https://github.com/rtklibexplorer/RTKLIB
+      RTKLIB_COMMIT: "50886e2fef3da7aa49fe87405cf52ff99972711d"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build RTKLIB-EX
+        run: |
+          git clone --filter=blob:none "$RTKLIB_REPO" rtklib-src
+          git -C rtklib-src checkout "$RTKLIB_COMMIT"
+          scripts/build-rtklib.sh rtklib-src rtklib-bin
+      - name: Compare with the published coordinates
+        env:
+          AZIMUT_RTKLIB_DIR: ${{ github.workspace }}/rtklib-bin
+          AZIMUT_REQUIRE_RTKLIB: "1"
+        run: cargo test --locked -p azimut-solve --test ppk_accuracy -- --nocapture

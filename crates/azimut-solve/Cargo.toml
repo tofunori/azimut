@@ -16,4 +16,5 @@ thiserror.workspace = true
 
 [dev-dependencies]
 azimut-io = { workspace = true, features = ["synthetic"] }
+flate2 = "1.0"
 tempfile.workspace = true
